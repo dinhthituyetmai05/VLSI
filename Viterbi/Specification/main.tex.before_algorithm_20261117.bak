@@ -1,0 +1,681 @@
+% !TeX program = xelatex
+\documentclass[12pt,a4paper]{article}
+\usepackage{iftex,mathptmx}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5]{fontenc}
+\else
+  \usepackage{fontspec}
+  \setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+  \setmonofont{lmmono10-regular.otf}
+\fi
+\usepackage[vietnamese]{babel}
+\usepackage{amsmath,amssymb,graphicx,booktabs,longtable,tabularx,array,float}
+\usepackage[paperwidth=21cm,paperheight=29.7cm,left=3cm,right=2cm,top=2cm,bottom=2.5cm]{geometry}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
+\usepackage{titlesec,fancyhdr,caption,enumitem,pdflscape,placeins}
+\usepackage[unicode]{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,pdftitle={Specification - Bo giai ma Viterbi K=3},pdfauthor={Nhom VLSI}}
+\setlength{\parindent}{0.8cm}
+\setlength{\parskip}{5pt}
+\renewcommand{\baselinestretch}{1.12}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.16}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\titleformat{\section}{\centering\bfseries\fontsize{16}{19}\selectfont}{\thesection.}{.5em}{}
+\titleformat{\subsection}{\bfseries\fontsize{14}{17}\selectfont}{\thesubsection}{.6em}{}
+\titleformat{\subsubsection}{\bfseries\fontsize{12}{15}\selectfont}{\thesubsubsection}{.6em}{}
+\titlespacing*{\section}{0pt}{16pt}{10pt}
+\titlespacing*{\subsection}{0pt}{12pt}{6pt}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\captionsetup{font=small,labelfont=bf,skip=7pt}
+\pagestyle{fancy}\fancyhf{}
+\fancyfoot[L]{\small BTL VLSI -- VITERBI DECODER}
+\fancyfoot[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\DeclareRobustCommand{\code}[1]{\texttt{#1}}
+\let\originalunderscore\_
+\renewcommand{\_}{\originalunderscore\allowbreak}
+\pdfstringdefDisableCommands{\def\code#1{#1}\def\allowbreak{}}
+\setlist[itemize]{topsep=3pt,itemsep=2pt,leftmargin=1.7em}
+\setcounter{tocdepth}{2}
+\begin{document}
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\begin{tikzpicture}[remember picture,overlay]
+\draw[line width=2pt] ($(current page.north west)+(3cm,-2cm)$) rectangle ($(current page.south east)+(-2cm,2.5cm)$);
+\draw[line width=.45pt] ($(current page.north west)+(3.12cm,-2.12cm)$) rectangle ($(current page.south east)+(-2.12cm,2.62cm)$);
+\end{tikzpicture}\par
+\vspace*{.65cm}\centering
+{\bfseries\large ĐẠI HỌC BÁCH KHOA HÀ NỘI\\TRƯỜNG ĐIỆN -- ĐIỆN TỬ\par}
+\vspace{.6cm}\includegraphics[height=3.65cm]{Images/logodhbk.png}\par
+\vspace{.8cm}{\bfseries\Huge BÁO CÁO BÀI TẬP LỚN\par}
+\vspace{.22cm}{\bfseries\large HỌC PHẦN: THIẾT KẾ VI MẠCH TÍCH HỢP (VLSI)\par}
+\vspace{.45cm}{\bfseries\Large ĐẶC TẢ THIẾT KẾ (SPECIFICATION)\\BỘ GIẢI MÃ VITERBI\par}
+\vspace{.45cm}{\normalsize Mã chập $K=3$, $R=1/2$, đa thức sinh $(7,5)_8$\par}
+\vspace{.25cm}{\normalsize Đặc tả hệ thống -- Datapath -- Controller -- Kiểm chứng\par}
+\vspace{.8cm}
+\begin{tabular}{@{}p{4.1cm}p{7.9cm}@{}}
+\textbf{Sinh viên thực hiện:}& Vũ Thanh Hằng -- 20233385\\[4pt]
+& Đinh Thị Tuyết Mai -- 20233516\\[4pt]
+& Lương Ngọc Minh -- 20233529\\[10pt]
+\textbf{GV hướng dẫn:}& TS. Nguyễn Vũ Thắng
+\end{tabular}
+\vfill{\normalsize Hà Nội, tháng 11 năm 2026\par}\vspace{.6cm}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+\tableofcontents\clearpage
+\listoffigures\clearpage
+\listoftables\clearpage
+\section*{DANH MỤC CHỮ VIẾT TẮT}
+\addcontentsline{toc}{section}{DANH MỤC CHỮ VIẾT TẮT}
+\begin{tabularx}{\textwidth}{@{}P{1.8cm}Y@{}}\toprule
+BMU & Branch Metric Unit: khối tính độ sai khác của từng nhánh trellis.\\
+ACS & Add--Compare--Select: cộng, so sánh và chọn đường sống sót.\\
+PM & Path Metric: tổng khoảng cách của đường đi đến một trạng thái.\\
+SM & Survivor Memory: bộ nhớ lưu quyết định chọn đường.\\
+TB & Traceback: truy vết ngược để khôi phục các bit thông tin.\\
+FSM & Finite State Machine: máy trạng thái hữu hạn.\\
+RTL & Register Transfer Level: mức mô tả thanh ghi và truyền dữ liệu.\\
+STA & Static Timing Analysis: phân tích thời gian tĩnh.\\
+PPA & Power, Performance, Area: công suất, hiệu năng và diện tích.\\
+\bottomrule\end{tabularx}
+\clearpage\pagenumbering{arabic}
+
+\section{GIỚI THIỆU VÀ PHẠM VI}
+\subsection{Mục tiêu thiết kế}
+Bộ giải mã Viterbi được dùng để khôi phục dữ liệu đã mã hóa bằng mã chập khi một số bit truyền qua kênh bị sai. Với mỗi chuỗi nhận, thuật toán xét các đường đi hợp lệ trên trellis và giữ lại đường có tổng khoảng cách nhỏ nhất. Thiết kế trong báo cáo nhận trọn một khung 16 bit, xử lý tám symbol mã hóa và trả về tám bit thông tin.
+
+Cấu hình được chọn là mã chập có chiều dài ràng buộc $K=3$, tốc độ $R=1/2$ và cặp đa thức sinh $(7,5)_8$. Do encoder chỉ có hai bit nhớ, trellis gồm bốn trạng thái. Bốn phép cập nhật metric được thực hiện song song trong mỗi chu kỳ; sau khi xử lý hết khung, mạch truy vết ngược tám bước để ghép kết quả. Cách tổ chức này giữ datapath nhỏ, đồng thời có trình tự hoạt động cố định và dễ kiểm tra.
+
+Báo cáo đặc tả giao tiếp, thuật toán, các khối tính toán và controller ở mức RTL. Trọng tâm của phần controller là quan hệ giữa trạng thái FSM và các lần nạp, dịch, ghi bộ nhớ, cập nhật metric và chốt đầu ra. Các tên tín hiệu được giữ như trong mã nguồn để có thể đối chiếu trực tiếp khi viết testbench hoặc xem waveform.
+
+\subsection{Cấu hình và giới hạn áp dụng}
+Thiết kế giải mã theo quyết định cứng (hard-decision): mỗi symbol nhận chỉ gồm hai giá trị nhị phân, không có thông tin về độ tin cậy. Khoảng cách Hamming được dùng làm tiêu chí chọn đường. Với mô hình kênh có lỗi bit độc lập và xác suất lật bit như nhau, nhỏ hơn $1/2$, việc tìm đường có khoảng cách nhỏ nhất tương ứng với giải mã hợp lý cực đại.
+
+Mỗi khung bắt đầu từ trạng thái encoder 00. Tám bit thông tin được mã hóa độc lập với khung trước; mạch không duy trì trạng thái trellis qua ranh giới khung. Thiết kế cũng không yêu cầu chèn hai bit đuôi để ép encoder về 00, vì vậy trạng thái cuối phải được chọn từ bốn path metric. Các trường hợp soft-decision, puncturing, độ dài khung thay đổi hoặc giải mã dòng liên tục nằm ngoài cấu hình này.
+
+Đầu ra \code{done} báo rằng phép giải mã đã hoàn tất. Tín hiệu này không xác nhận rằng dữ liệu gốc luôn được khôi phục: khi lỗi kênh nhiều hoặc có nhiều đường cùng khoảng cách, bộ giải mã vẫn trả kết quả theo quy tắc chọn đường đã định.
+
+\section{ĐẶC TẢ CHỨC NĂNG HỆ THỐNG}
+\subsection{Thông số chính}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.0cm}Y@{}}\toprule
+\textbf{Hạng mục}&\textbf{Đặc tả}\\\midrule
+Mã chập & $K=3$, $R=1/2$, đa thức sinh $(7,5)_8$.\\
+Trellis & Bốn trạng thái 00, 01, 10, 11; hai nhánh vào mỗi trạng thái.\\
+Khung vào / khung ra & 16 bit mã hóa / 8 bit thông tin; tám symbol 2 bit.\\
+Branch metric & Không dấu, 2 bit; giá trị chức năng từ 0 đến 2.\\
+Path metric & Không dấu, 5 bit; 31 biểu diễn trạng thái chưa thể tới.\\
+Khởi tạo mỗi khung & $PM(00)=0$; ba metric còn lại bằng 31.\\
+Trạng thái kết thúc & Trạng thái có metric nhỏ nhất; hòa thì chọn chỉ số nhỏ hơn.\\
+Bộ nhớ survivor & Tám từ, mỗi từ bốn quyết định; tổng cộng 32 bit.\\
+Thứ tự dữ liệu & \code{MSB\_FIRST=0} mặc định; hỗ trợ thêm chế độ bằng 1.\\
+Clock và reset & Clock cạnh lên; reset bất đồng bộ, tích cực mức cao.\\
+Độ trễ / khoảng nhận khung & 17 chu kỳ / tối thiểu 18 chu kỳ.\\
+\bottomrule\end{tabularx}
+\caption{Thông số chức năng của bộ giải mã}\label{tab:system-spec}
+\end{table}
+Số bit path metric được chọn theo độ dài khung. Mỗi symbol đóng góp nhiều nhất hai đơn vị khoảng cách, nên mọi đường đi hữu hạn sau tám bước có metric không vượt quá $8\times2=16$. Miền 5 bit đủ chứa các metric này và dành riêng giá trị 31 cho trạng thái chưa thể tới; mạch không cần chuẩn hóa metric giữa khung.
+
+\subsection{Quy ước trạng thái và trellis}
+Gọi $u_t$ là bit thông tin tại bước $t$, với $t=0,\ldots,7$. Trạng thái encoder trước khi nhận bit đó được viết là $s_t=(a,b)=(u_{t-1},u_{t-2})$. Bit mới hơn nằm ở vị trí cao của mã trạng thái. Đầu ra mã hóa và trạng thái kế tiếp là
+\begin{equation}
+v_{0,t}=u_t\oplus a\oplus b,\qquad
+v_{1,t}=u_t\oplus b,\qquad s_{t+1}=(u_t,a).
+\label{eq:encoder}
+\end{equation}
+Trong mỗi symbol, $v_0$ là bit cao và $v_1$ là bit thấp. Cách viết $v_0v_1$ trong Bảng~\ref{tab:trellis} vì thế cũng chính là cách đóng gói cặp bit đưa vào BMU.
+\begin{table}[H]\centering\small
+\begin{tabular}{cccc}\toprule
+\textbf{Trạng thái trước}&\textbf{$u_t$}&\textbf{Symbol $v_0v_1$}&\textbf{Trạng thái sau}\\\midrule
+00&0&00&00\\00&1&11&10\\01&0&11&00\\01&1&00&10\\
+10&0&10&01\\10&1&01&11\\11&0&01&01\\11&1&10&11\\
+\bottomrule\end{tabular}
+\caption{Tám nhánh trellis của mã chập $(7,5)_8$}\label{tab:trellis}
+\end{table}
+Ví dụ, từ trạng thái 10 và bit vào 0, encoder phát symbol 10 rồi chuyển sang 01. Theo chiều giải mã, một trạng thái đích $(u,a)$ chỉ có thể đến từ hai trạng thái $(a,0)$ và $(a,1)$. Vì bit $a$ đã biết từ trạng thái đích, chỉ cần lưu thêm một bit để phân biệt hai predecessor. Đây là cơ sở để survivor memory chỉ dùng bốn bit cho mỗi bước trellis.
+
+\subsection{Tính metric và chọn đường sống sót}
+Với symbol nhận $r_t$, khoảng cách nhánh bằng số vị trí khác nhau giữa $r_t$ và symbol dự kiến của nhánh:
+\begin{equation}
+BM_t(p\rightarrow j)=\operatorname{popcount}\bigl(r_t\oplus v(p\rightarrow j)\bigr).
+\end{equation}
+Gọi $PM_t(p)$ là metric sau khi đã xử lý $t$ symbol. Đối với mỗi trạng thái đích $j$, hai ứng viên được tính và bão hòa như sau:
+\begin{equation}
+c_i=\min\bigl(PM_t(p_i)+BM_t(p_i\rightarrow j),31\bigr),\quad
+PM_{t+1}(j)=\min(c_0,c_1).
+\label{eq:metric}
+\end{equation}
+ACS chọn candidate 1 chỉ khi $c_1<c_0$. Khi hai giá trị bằng nhau, candidate 0 được giữ lại. Trong cách nối trellis hiện tại, candidate 0 luôn ứng với predecessor có bit nhớ cũ bằng 0. Quy tắc này làm kết quả xác định ngay cả khi có nhiều đường cùng khoảng cách.
+
+Giá trị vô cực cần được giữ nguyên khi cộng branch metric. Nếu chỉ dùng phép cộng 5 bit, $31+1$ có thể quay về 0 và khiến một đường không hợp lệ được chọn. RTL vì vậy cộng với một bit mở rộng, rồi giới hạn kết quả ở 31 trước khi so sánh.
+
+\subsection{Thứ tự symbol và bit thông tin}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{2.9cm}Y Y@{}}\toprule
+\textbf{Tham số}&\textbf{Thứ tự symbol theo thời gian}&\textbf{Vị trí của $u_0,u_1,\ldots,u_7$}\\\midrule
+\code{MSB\_FIRST=0}&\code{encoded\_data[1:0]}, [3:2], \ldots, [15:14]&\code{decoded\_data[0]}, [1], \ldots, [7]\\
+\code{MSB\_FIRST=1}&\code{encoded\_data[15:14]}, [13:12], \ldots, [1:0]&\code{decoded\_data[7]}, [6], \ldots, [0]\\
+\bottomrule\end{tabularx}
+\caption{Quy ước đóng gói dữ liệu trong hai chế độ}\label{tab:ordering}
+\end{table}
+Tham số chỉ đổi thứ tự các symbol và vị trí lưu bit thông tin; thứ tự $\{v_0,v_1\}$ bên trong từng cặp vẫn giữ nguyên. Ví dụ, ở chế độ mặc định, byte thông tin \code{8'h19} được đọc theo thời gian là $1,0,0,1,1,0,0,0$ và tạo từ mã \code{16'h35FB}. Một hệ thống dùng thứ tự ngược cần đổi tham số hoặc cách đóng gói cả khung, thay vì đảo riêng hai bit trong từng symbol.
+
+\section{KIẾN TRÚC TOP-LEVEL VÀ GIAO TIẾP}
+\subsection{Phân chia các module}
+Module \code{viterbi\_decoder} là top cấu trúc: nó khai báo các dây nối và ghép bốn module con. Toàn bộ phần tử lưu trữ và FSM nằm trong \code{viterbi\_control}. BMU, khối ACS và bộ chọn trạng thái cuối là các mạch tổ hợp, nhận dữ liệu hiện tại từ controller và trả kết quả về controller.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.54\textheight,keepaspectratio]{Images/viterbi_decoder_architecture.png}
+\caption{Kiến trúc top-level và vòng cập nhật path metric}\label{fig:top}
+\end{figure}
+Trong pha giải mã, controller đưa symbol hiện tại tới BMU và đưa bốn metric hiện tại tới ACS unit. BMU tạo bốn khoảng cách Hamming dùng chung cho tám nhánh trellis. ACS unit tính bốn metric mới cùng bốn quyết định survivor; tất cả được chốt tại cùng một cạnh clock. Khi hết tám symbol, bộ chọn trạng thái cuối đọc metric đã chốt và cung cấp điểm bắt đầu traceback.
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.5cm}P{2cm}Y@{}}\toprule
+\textbf{Module}&\textbf{Loại mạch}&\textbf{Trách nhiệm}\\\midrule
+\code{viterbi\_decoder}&Top cấu trúc&Ghép các module và giữ giao diện với hệ thống ngoài.\\
+\code{viterbi\_control}&Tuần tự&Nhận khung; lưu metric, survivor; điều khiển traceback và đầu ra.\\
+\code{viterbi\_branch\_metrics}&Tổ hợp&Tính khoảng cách từ symbol nhận tới 00, 01, 10, 11.\\
+\code{viterbi\_acs\_unit}&Tổ hợp&Nối bốn ACS theo đúng các nhánh trellis.\\
+\code{viterbi\_acs}&Tổ hợp&Cộng bão hòa, so sánh hai ứng viên, phát metric và decision.\\
+\code{viterbi\_best\_state}&Tổ hợp&Chọn trạng thái cuối có metric nhỏ nhất.\\
+\bottomrule\end{tabularx}
+\caption{Phạm vi chức năng của sáu module RTL}\label{tab:modules}
+\end{table}
+Việc tách controller thành module riêng không tạo thêm tầng pipeline. Ranh giới thời gian vẫn là các thanh ghi trong controller, vì vậy độ trễ của khung được xác định bởi FSM và hai bộ đếm, không phải bởi số lượng module trong sơ đồ.
+
+\subsection{Cổng top-level}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}c c Y@{}}\toprule
+\textbf{Tín hiệu}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Ý nghĩa}\\\midrule
+\code{clk}&Vào&1&Clock; mọi thao tác tuần tự dùng cạnh lên.\\
+\code{reset}&Vào&1&Reset bất đồng bộ, tích cực mức 1, ưu tiên cao nhất.\\
+\code{start}&Vào&1&Yêu cầu nhận khung; được xét khi controller ở IDLE.\\
+\code{encoded\_data}&Vào&16&Toàn bộ khung mã hóa, ổn định tại cạnh nhận \code{start}.\\
+\code{busy}&Ra&1&Bằng 1 khi FSM khác IDLE.\\
+\code{done}&Ra&1&Xung một chu kỳ khi kết quả mới được chốt.\\
+\code{decoded\_data}&Ra&8&Kết quả đã chốt, giữ đến lần hoàn tất tiếp theo hoặc reset.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện module \code{viterbi\_decoder}}\label{tab:top-ports}
+\end{table}
+\code{MSB\_FIRST} là tham số cấu hình khi elaboration, không phải cổng chọn chế độ lúc chạy. Độ dài khung, số trạng thái và độ rộng bus metric của toàn decoder được cố định trong RTL này. Dù một ACS có tham số \code{METRIC\_WIDTH}, chỉ đổi tham số ở cell đó không làm toàn hệ thống tự mở rộng.
+
+\subsection{Giao thức nhận khung và báo hoàn tất}
+Một khung được nhận ở cạnh lên khi \code{reset=0}, \code{start=1} và controller đang ở IDLE, tương ứng \code{busy=0}. Tại cạnh này, mạch chốt cả 16 bit đầu vào và khởi tạo lại metric. Sau cạnh nhận, hệ thống ngoài có thể đổi \code{encoded\_data}; khung đang xử lý chỉ lấy dữ liệu từ thanh ghi nội bộ.
+
+\code{start} không được xếp hàng. Nếu yêu cầu xuất hiện khi \code{busy=1}, khung đó không được nhận và không làm thay đổi khung đang xử lý. Khi giữ \code{start=1} liên tục, decoder tự nhận khung tiếp theo ở cạnh đầu tiên mà FSM đã trở về IDLE. Bên phát vì vậy cần phát xung \code{start} hoặc theo dõi \code{busy} để tránh gửi lặp.
+
+Khi hoàn tất traceback, \code{decoded\_data} cập nhật đồng thời với \code{done=1} và \code{busy=0}. Kết quả giữ nguyên trong suốt thời gian chờ và xử lý khung tiếp theo. Mạch nhận dữ liệu nên dùng \code{done} để phân biệt kết quả mới với kết quả đang được giữ trên bus; giá trị 0 sau reset chưa đại diện cho một khung đã giải mã.
+
+\subsection{Độ trễ và thông lượng}
+Gọi $N$ là cạnh nhận \code{start}. Các công việc tại những cạnh tiếp theo được quy định trong Bảng~\ref{tab:timing}. Cột trạng thái là trạng thái \emph{trước} cạnh lên, tức nhánh RTL được thực hiện tại cạnh đó.
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{2.4cm}P{3.6cm}Y@{}}\toprule
+\textbf{Cạnh}&\textbf{Trạng thái trước cạnh}&\textbf{Công việc và kết quả sau cạnh}\\\midrule
+$N$&IDLE&Nhận khung, khởi tạo metric, chuyển sang DECODE; \code{busy=1}.\\
+$N+1$ đến $N+8$&DECODE&Chốt tám lần ACS và tám từ survivor, theo chỉ số 0 đến 7.\\
+$N+9$&SELECT\_FINAL\_STATE&Chốt \code{best\_state}, đặt chỉ số truy vết bằng 7, sang TRACEBACK.\\
+$N+10$ đến $N+16$&TRACEBACK&Khôi phục bảy bit theo thứ tự thời gian ngược.\\
+$N+17$&TRACEBACK&Khôi phục bit cuối; chốt đủ tám bit; phát \code{done}, trở về IDLE.\\
+$N+18$&IDLE&Xóa \code{done}; có thể nhận ngay khung tiếp theo.\\
+\bottomrule\end{tabularx}
+\caption{Lịch hoạt động theo cạnh clock của một khung}\label{tab:timing}
+\end{table}
+Độ trễ từ cạnh nhận đến cạnh trả kết quả là $8+1+8=17$ chu kỳ. Tuy nhiên, ở cạnh $N+17$ mạch vẫn thực hiện nhánh TRACEBACK nên chưa nhận khung mới; khoảng cách nhận hai khung liên tiếp nhỏ nhất là 18 chu kỳ. Với clock mục tiêu 200 MHz, độ trễ giao thức là 85 ns và chu kỳ khung nhỏ nhất là 90 ns. Thông lượng thông tin cực đại tương ứng
+\begin{equation}
+T_{\mathrm{info}}=\frac{8}{18}f_{clk}\approx88.89\ \mathrm{Mbit/s}\quad\text{tại }f_{clk}=200\ \mathrm{MHz}.
+\end{equation}
+Các giá trị trên được suy ra từ lịch FSM; khả năng chạy thực tế ở 200 MHz còn phải được xác nhận bằng phân tích timing với thư viện công nghệ.
+
+\section{ĐẶC TẢ CONTROLLER}
+\subsection{Vai trò và sơ đồ tổng quan}
+Controller vừa điều khiển trình tự, vừa chứa phần datapath tuần tự của decoder. Nó giữ khung đầu vào, bốn path metric, bộ nhớ survivor và các thanh ghi traceback. Do đó, tên \code{viterbi\_control} không chỉ biểu thị một FSM phát tín hiệu enable. Các phép tính khoảng cách nhánh, ACS và chọn metric nhỏ nhất vẫn nằm ngoài module này.
+
+Sơ đồ Controller Overview ở Hình~\ref{fig:controller-overview} nhóm phần cứng thành các chức năng K1 đến K9. Nét liền biểu diễn dữ liệu; nét đứt biểu diễn điều kiện nạp, ghi hoặc chuyển bước. Các nhãn load, shift, enable, clear và commit trong hình mô tả tác động của FSM lên thanh ghi. Chúng không phải các cổng điều khiển bổ sung của module RTL.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{Images/controller_overview.png}
+\caption{Controller Overview: các nhóm lưu trữ và điều khiển trong \code{viterbi\_control}}\label{fig:controller-overview}
+\end{figure}
+Luồng dữ liệu tiến đi qua K1 và K2: K1 cấp từng symbol, K2 giữ metric để ACS cập nhật. Cùng lúc, K5 ghi quyết định survivor cho mỗi bước. Sau tám lần cập nhật, K4 và K6 duyệt ngược bộ nhớ; K7 đặt từng bit vào vị trí thích hợp, còn K8 giữ bản tin đang ghép và kết quả đã hoàn tất. K3 và K9 xác định lúc nào từng nhóm được phép thay đổi.
+
+\subsection{Giao diện với datapath tổ hợp}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.7cm}c c Y@{}}\toprule
+\textbf{Tín hiệu}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Điểm lấy mẫu / sử dụng}\\\midrule
+\code{clk}, \code{reset}, \code{start}&Vào&1 mỗi cổng&Clock, reset, yêu cầu khung như giao diện top.\\
+\code{encoded\_data}&Vào&16&Chốt khi IDLE và \code{start=1}.\\
+\code{next\_metrics}&Vào&20&Chốt vào \code{path\_metrics} ở mỗi cạnh DECODE.\\
+\code{survivor\_select}&Vào&4&Ghi vào hàng \code{symbol\_index} cùng cạnh chốt metric.\\
+\code{best\_state}&Vào&2&Chốt ở cạnh SELECT\_FINAL\_STATE.\\
+\code{received\_symbol}&Ra&2&Lấy trực tiếp từ một đầu của \code{encoded\_shift}.\\
+\code{path\_metrics}&Ra&20&Metric đã đăng ký của bốn trạng thái.\\
+\code{busy}&Ra&1&Giải mã tổ hợp từ \code{control\_state}.\\
+\code{done}, \code{decoded\_data}&Ra&1 và 8&Thanh ghi báo hoàn tất và giữ kết quả.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện của controller và thời điểm dùng dữ liệu}\label{tab:control-ports}
+\end{table}
+Không có giao thức valid/ready riêng giữa controller và BMU/ACS. Các khối tổ hợp luôn phản ứng theo đầu vào; controller chỉ chốt kết quả ở pha phù hợp. Cụ thể, \code{received\_symbol} chỉ được diễn giải là symbol cần xử lý khi FSM ở DECODE. Giá trị bus này trong IDLE hay TRACEBACK không kích hoạt một lần cập nhật metric.
+
+Sơ đồ kiến trúc ở Hình~\ref{fig:control-architecture} đặt các cổng ở biên controller bên cạnh phần lưu trữ tương ứng. \code{next\_metrics} đi vào thanh ghi metric, \code{survivor\_select} đi vào bộ nhớ quyết định, còn \code{best\_state} chỉ nạp thanh ghi truy vết. Cách chia ba đường phản hồi này cho thấy dữ liệu từ các khối tổ hợp được dùng ở những pha khác nhau, dù chúng luôn hiện diện trên bus.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.59\textheight,keepaspectratio]{Images/viterbi_control_architecture.png}
+\caption{Kiến trúc controller và các cổng trao đổi với datapath bên ngoài}\label{fig:control-architecture}
+\end{figure}
+
+Bus metric được đóng gói thống nhất là $\{PM11,PM10,PM01,PM00\}$. Các lát [4:0], [9:5], [14:10], [19:15] lần lượt ứng với trạng thái 00, 01, 10, 11. Dùng cùng cách đóng gói ở controller, ACS unit và best-state là điều kiện để các quyết định survivor khớp với metric tương ứng.
+
+\subsection{Thanh ghi và trạng thái lưu trữ}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.7cm}c Y@{}}\toprule
+\textbf{Đối tượng RTL}&\textbf{Số bit}&\textbf{Vai trò và điều kiện thay đổi}\\\midrule
+\code{encoded\_shift}&16&Nạp khung khi nhận \code{start}; dịch 2 bit mỗi cạnh DECODE.\\
+\code{path\_metrics}&20&Khởi tạo về $\{31,31,31,0\}$; cập nhật từ ACS trong DECODE.\\
+\code{symbol\_index}&3&Chỉ số symbol/hàng ghi survivor; bắt đầu 0, tăng đến 7.\\
+\code{survivor\_memory[0:7]}&32&Tám hàng 4 bit; chỉ ghi trong DECODE; không reset.\\
+\code{traceback\_index}&3&Nạp 7 khi chọn state cuối; giảm dần đến 0.\\
+\code{traceback\_state}&2&Nạp \code{best\_state}; chuyển về predecessor ở mỗi bước traceback.\\
+\code{decoded\_work}&8&Giữ các bit đang ghép; xóa khi nhận khung, cập nhật trong TRACEBACK.\\
+\code{decoded\_data}&8&Chỉ cập nhật khi hoàn tất khung hoặc reset.\\
+\code{control\_state}&2&Mã hóa bốn trạng thái FSM.\\
+\code{done}&1&Mặc định xóa tại mỗi cạnh; đặt 1 khi kết thúc TRACEBACK.\\
+\bottomrule\end{tabularx}
+\caption{Các phần tử lưu trữ trong controller}\label{tab:registers}
+\end{table}
+\code{decoded\_next} được khai báo là \code{reg} trong Verilog nhưng được gán đầy đủ trong khối \code{always @*}, nên đây là tín hiệu tổ hợp, không phải một thanh ghi clock bổ sung. Tương tự, \code{predecessor\_older\_bit}, \code{received\_symbol} và \code{busy} đều là tín hiệu tổ hợp. Phân biệt này giúp tránh đếm nhầm phần tử nhớ khi đánh giá kiến trúc.
+
+\subsection{Datapath của controller: các nhóm K1--K8}
+Hình~\ref{fig:controller-datapath} thể hiện các MUX, thanh ghi, bộ đếm, cổng so sánh và đường hồi tiếp bên trong controller ở chế độ mặc định. Bản đầy đủ được bố trí ở trang ngang; các vùng phóng to trong Phụ lục~\ref{sec:zoom} dùng để đọc tên tín hiệu và các lát bus. Các khối trong hình mô tả cấu trúc suy ra từ RTL; dạng cell hay cách ánh xạ bộ nhớ sau tổng hợp còn phụ thuộc công cụ và thư viện.
+\begin{landscape}
+\begin{figure}[p]\centering
+\includegraphics[width=\linewidth,height=14.7cm,keepaspectratio]{Images/controller_datapath.png}
+\caption{Controller datapath đầy đủ, gồm K1--K8 và FSM K9; cấu hình \code{MSB\_FIRST=0}}\label{fig:controller-datapath}
+\end{figure}
+\end{landscape}
+
+\subsubsection{K1 -- Nhận khung và cấp symbol}
+\code{encoded\_shift} có hai nguồn nạp: toàn bộ \code{encoded\_data} khi nhận khung, hoặc giá trị dịch của chính nó trong DECODE. Với \code{MSB\_FIRST=0}, BMU nhận [1:0] và thanh ghi dịch phải hai vị trí, chèn 00 ở phía cao. Với \code{MSB\_FIRST=1}, BMU nhận [15:14] và thanh ghi dịch trái hai vị trí, chèn 00 ở phía thấp.
+
+Tại mỗi cạnh DECODE, ACS chốt kết quả của symbol đang có \emph{trước cạnh}; việc dịch thanh ghi diễn ra cùng cạnh đó để chuẩn bị symbol tiếp theo. Nhờ ngữ nghĩa gán không chặn của RTL, symbol thứ nhất không bị bỏ qua khi dịch. Trong tám chu kỳ, mỗi cặp của khung nhận được xử lý đúng một lần.
+
+\subsubsection{K2 -- Lưu và cập nhật path metric}
+K2 dùng thanh ghi 20 bit chứa bốn metric 5 bit. Khi reset hoặc nhận khung, MUX chọn hằng $\{31,31,31,0\}$. Khi DECODE, MUX chọn \code{next\_metrics}; ở các trạng thái khác, thanh ghi giữ giá trị. Sau cạnh DECODE thứ tám, K2 chứa metric của cả khung, không còn là metric trung gian.
+
+Đường hồi tiếp K2--ACS--K2 thực hiện phép truy hồi của thuật toán. Bốn metric phải được chốt đồng thời: nếu cập nhật lần lượt theo trạng thái trong cùng một bước, một ACS có thể vô tình dùng metric đã thuộc bước tiếp theo. Cấu trúc bốn ACS song song và một bus thanh ghi chung tránh sai lệch đó.
+
+\subsubsection{K3 và K4 -- Hai bộ đếm với hai chiều duyệt}
+\code{symbol\_index} thuộc K3, chạy từ 0 đến 7 trong pha tiến. Bộ so sánh bằng 7 báo rằng lần cập nhật hiện tại là lần cuối. Ở chính cạnh có chỉ số 7, controller vẫn ghi metric và survivor rồi mới chuyển trạng thái; không bỏ qua hàng cuối của bộ nhớ.
+
+\code{traceback\_index} thuộc K4, được nạp 7 và duyệt về 0 trong pha ngược. Điều kiện bằng 0 dùng để nhận biết bước truy vết cuối. Bộ đếm chỉ giảm khi khác 0, nên không có bước đọc thêm ở địa chỉ 7 do tràn ngược. Hai bộ đếm được tách riêng để địa chỉ ghi survivor và địa chỉ đọc traceback có ý nghĩa rõ ràng.
+
+\subsubsection{K5 -- Bộ nhớ survivor}
+Mỗi lần ACS cập nhật đồng thời bốn trạng thái, bus \code{survivor\_select[3:0]} được ghi nguyên từ vào \code{survivor\_memory[symbol\_index]}. Bit $j$ của từ này là quyết định cho trạng thái đích $j$ tại bước đó. Một hàng bộ nhớ lưu toàn bộ thông tin chọn đường cần dùng về sau; không cần lưu cả chuỗi bit của từng đường.
+
+Trong pha traceback, địa chỉ hàng là \code{traceback\_index}, còn \code{traceback\_state} chọn một trong bốn bit của hàng. Đường đọc trong sơ đồ được biểu diễn bằng MUX 8:1 rồi MUX 4:1. Đây là cách diễn giải logic của biểu thức truy cập mảng, không phải yêu cầu phải dùng một macro RAM cụ thể.
+
+\subsubsection{K6 -- Thanh ghi trạng thái truy vết}
+Ở SELECT\_FINAL\_STATE, K6 nạp trạng thái có metric nhỏ nhất. Trong TRACEBACK, bit cao của trạng thái hiện tại cho biết bit thông tin, còn bit thấp cùng decision đọc từ K5 xác định predecessor:
+\begin{equation}
+u_t=\code{traceback\_state}[1],\qquad
+s_t=\{\code{traceback\_state}[0],\code{predecessor\_older\_bit}\}.
+\label{eq:traceback}
+\end{equation}
+Bit thông tin và predecessor đều phải được tính từ trạng thái trước cạnh clock. Sau cạnh đó, thanh ghi mới chuyển về state trước để chuẩn bị bước tiếp theo. Đổi thứ tự logic này sẽ làm lệch một bước trong bản tin thu được.
+
+\subsubsection{K7 và K8 -- Ghi bit, bộ đệm làm việc và đầu ra}
+K7 chọn một vị trí trong tám bit của \code{decoded\_work}, thay vị trí đó bằng bit vừa truy vết và giữ nguyên bảy vị trí còn lại. Kết quả tổ hợp là \code{decoded\_next}. Với chế độ mặc định, vị trí ghi bằng \code{traceback\_index}; với MSB-first, vị trí ghi bằng $7-\code{traceback\_index}$.
+
+K8 tách bộ đệm đang ghép khỏi thanh ghi đầu ra. Mỗi bước TRACEBACK chốt \code{decoded\_next} vào \code{decoded\_work}. Chỉ ở bước chỉ số 0, cùng giá trị \code{decoded\_next} mới được chốt vào \code{decoded\_data}. Nếu chốt đầu ra từ \code{decoded\_work} ở cạnh này, giá trị đọc vẫn là bộ đệm trước cạnh và sẽ thiếu bit cuối. Dùng \code{decoded\_next} bảo đảm cả tám bit xuất hiện cùng lúc với \code{done}.
+
+\subsection{K9 -- FSM và điều kiện chuyển trạng thái}
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.60\textheight,keepaspectratio]{Images/viterbi_control_fsm.png}
+\caption{Bốn trạng thái FSM và điều kiện chuyển pha}\label{fig:fsm}
+\end{figure}
+FSM có bốn mã trạng thái 2 bit: IDLE = 00, DECODE = 01, SELECT\_FINAL\_STATE = 10, TRACEBACK = 11. Reset từ bất kỳ pha nào đưa mạch về IDLE. \code{busy} được giải mã từ điều kiện trạng thái khác IDLE; \code{done} là thanh ghi phát xung ở bước kết thúc.
+
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.5cm}P{3.1cm}Y@{}}\toprule
+\textbf{Trạng thái hiện tại}&\textbf{Điều kiện}&\textbf{Trạng thái sau cạnh / tác động}\\\midrule
+IDLE&\code{start=0}&Giữ IDLE, chờ khung.\\
+IDLE&\code{start=1}&Nạp khung và metric đầu, xóa bộ đệm; sang DECODE.\\
+DECODE&\code{symbol\_index<7}&Chốt ACS, ghi survivor, dịch symbol; tăng chỉ số và giữ DECODE.\\
+DECODE&\code{symbol\_index=7}&Vẫn chốt lần thứ tám, sau đó sang SELECT\_FINAL\_STATE.\\
+SELECT\_FINAL\_STATE&Vô điều kiện&Nạp state cuối và chỉ số 7; sang TRACEBACK.\\
+TRACEBACK&\code{traceback\_index>0}&Ghi một bit, lùi state, giảm chỉ số; giữ TRACEBACK.\\
+TRACEBACK&\code{traceback\_index=0}&Ghi bit cuối, chốt đầu ra, đặt \code{done=1}; về IDLE.\\
+\bottomrule\end{tabularx}
+\caption{Bảng chuyển trạng thái và thao tác tại cạnh clock}\label{tab:fsm}
+\end{table}
+Chu kỳ SELECT\_FINAL\_STATE có nhiệm vụ tách thời điểm ghi metric thứ tám khỏi thời điểm chốt \code{best\_state}. Sau cạnh $N+8$, bộ so sánh tổ hợp nhìn thấy bốn metric cuối đã cập nhật; đến cạnh $N+9$, controller mới nạp kết quả đó vào thanh ghi traceback. Nếu chọn state ngay tại cạnh $N+8$ từ bus metric cũ, kết quả sẽ dựa trên bảy symbol.
+
+\subsection{Điều kiện cho phép cập nhật từng nhóm}
+Đặt $A$ là sự kiện nhận khung, tức IDLE và \code{start=1}. Các ký hiệu $D$, $S$, $T$ lần lượt chỉ pha DECODE, SELECT\_FINAL\_STATE và TRACEBACK. Hai cờ $Z_s$ và $Z_t$ tương ứng với điều kiện chỉ số symbol bằng 7 và chỉ số traceback bằng 0. Sự kiện hoàn tất là $F=T\land Z_t$. Các ký hiệu này giúp đọc các đường điều khiển K9 trong hình; RTL hiện thực chúng bằng điều kiện trong khối tuần tự.
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.0cm}P{3.1cm}Y@{}}\toprule
+\textbf{Đích cập nhật}&\textbf{Điều kiện}&\textbf{Dữ liệu được nạp}\\\midrule
+\code{encoded\_shift}&$A$ hoặc $D$&Khung mới nếu $A$; giá trị dịch nếu $D$.\\
+\code{path\_metrics}&$A$ hoặc $D$&Metric đầu nếu $A$; \code{next\_metrics} nếu $D$.\\
+\code{symbol\_index}&$A$ hoặc $(D\land\neg Z_s)$&0 nếu $A$; chỉ số cộng 1 khi chưa đến 7.\\
+Survivor memory&$D$&Bốn decision, tại địa chỉ \code{symbol\_index}.\\
+\code{traceback\_state}&$S$ hoặc $T$&\code{best\_state} nếu $S$; predecessor nếu $T$.\\
+\code{traceback\_index}&$S$ hoặc $(T\land\neg Z_t)$&7 nếu $S$; chỉ số trừ 1 khi chưa đến 0.\\
+\code{decoded\_work}&$A$ hoặc $T$&0 nếu $A$; \code{decoded\_next} nếu $T$.\\
+\code{decoded\_data}&$F$&\code{decoded\_next}, gồm cả bit vừa khôi phục.\\
+\code{done}&Mỗi cạnh&1 nếu $F$; 0 trong các trường hợp còn lại.\\
+\bottomrule\end{tabularx}
+\caption{Điều kiện cập nhật thanh ghi khi không có reset}\label{tab:enables}
+\end{table}
+Bảng~\ref{tab:enables} cũng cho thấy các thanh ghi không cần cập nhật ở mọi chu kỳ. Chẳng hạn, metric giữ nguyên trong TRACEBACK, còn đầu ra giữ nguyên trong DECODE. Tín hiệu cho phép trong sơ đồ được hiểu là chọn giữa nạp dữ liệu và giữ giá trị; RTL không chặn hay tạo thêm clock nội bộ.
+
+\subsection{Reset, hủy khung và tính độc lập giữa các khung}
+Reset có ưu tiên cao hơn mọi trạng thái và yêu cầu \code{start}. Khi reset lên 1, controller về IDLE, xóa \code{done}, \code{decoded\_data}, bộ đệm và các chỉ số; metric trở về giá trị khởi tạo. Khung đang xử lý bị hủy, không phát một xung hoàn tất cho khung đó. Khi tích hợp, việc nhả reset cần đáp ứng yêu cầu recovery/removal của phần tử tuần tự trong công nghệ dùng để tổng hợp.
+
+Survivor memory không nằm trong nhánh reset. Tuy vậy, dữ liệu cũ không ảnh hưởng một khung hợp lệ: mỗi lần nhận khung, chỉ số ghi bắt đầu lại từ 0; mạch ghi đủ tám hàng trong DECODE rồi mới cho phép TRACEBACK dùng bộ nhớ. Nếu reset cắt ngang DECODE hoặc TRACEBACK, khung tiếp theo vẫn phải đi lại toàn bộ tám bước ghi trước khi đọc để giải mã.
+
+Đường đọc survivor là tổ hợp nên trong mô phỏng, nó có thể mang X ở lúc bộ nhớ chưa được ghi. Controller không chốt kết quả giải mã từ đường đó ngoài TRACEBACK. Do đó, tiêu chí kiểm tra là không để dữ liệu chưa hợp lệ lan tới kết quả được báo bằng \code{done}, thay vì yêu cầu mọi dây nội bộ phải có giá trị nhị phân ngay sau reset.
+
+\section{ĐẶC TẢ CÁC KHỐI TÍNH TOÁN}
+\subsection{BMU -- Tính khoảng cách nhánh}
+\subsubsection{Chức năng và giao diện}
+\code{viterbi\_branch\_metrics} tính song song khoảng cách từ symbol nhận tới bốn symbol 00, 01, 10, 11. Khối không có clock hoặc reset; độ trễ của nó là độ trễ tổ hợp. Bốn kết quả được dùng chung cho tám nhánh trellis, vì nhiều nhánh có cùng symbol mã hóa.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.44\textheight,keepaspectratio]{Images/viterbi_branch_metrics_logic.png}
+\caption{BMU: tính bốn khoảng cách Hamming từ một symbol 2 bit}\label{fig:bmu}
+\end{figure}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.3cm}c c Y@{}}\toprule
+\textbf{Cổng}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Ý nghĩa}\\\midrule
+\code{received\_symbol}&Vào&2&Symbol nhận $r=\{r_1,r_0\}$.\\
+\code{distance\_00}, \code{distance\_01}&Ra&2 mỗi cổng&Khoảng cách tới 00 và 01.\\
+\code{distance\_10}, \code{distance\_11}&Ra&2 mỗi cổng&Khoảng cách tới 10 và 11.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện của BMU}\label{tab:bmu-ports}
+\end{table}
+
+\subsubsection{Phương trình và ý nghĩa kết quả}
+Với hai bit nhận $r_1,r_0$, các khoảng cách được viết thành
+\begin{equation}
+\begin{aligned}
+d_{00}&=r_1+r_0,& d_{01}&=r_1+\overline{r_0},\\
+d_{10}&=\overline{r_1}+r_0,& d_{11}&=\overline{r_1}+\overline{r_0}.
+\end{aligned}
+\end{equation}
+Phép cộng ở đây là cộng số học hai bit sai khác, không phải XOR. Vì $1+1=2$, RTL mở rộng mỗi toán hạng trước khi cộng để đầu ra biểu diễn được cả giá trị 2.
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{$r_1r_0$}&\textbf{$d_{00}$}&\textbf{$d_{01}$}&\textbf{$d_{10}$}&\textbf{$d_{11}$}\\\midrule
+00&0&1&1&2\\01&1&0&2&1\\10&1&2&0&1\\11&2&1&1&0\\
+\bottomrule\end{tabular}
+\caption{Bảng chân trị của bốn branch metric}\label{tab:bmu-truth}
+\end{table}
+Ví dụ, symbol nhận 10 cách symbol 00 một bit, cách 01 hai bit và trùng với 10, nên các khoảng cách tương ứng là 1, 2 và 0. Khoảng cách nhỏ chỉ cho biết nhánh phù hợp hơn với symbol hiện tại; việc quyết định đường đi còn phải cộng metric tích lũy của predecessor trong ACS.
+
+\subsection{Một ACS -- Cộng, so sánh và chọn}
+\subsubsection{Giao diện và phép tính}
+Mỗi \code{viterbi\_acs} phục vụ một trạng thái đích. Nó nhận metric của hai predecessor cùng branch metric tương ứng, trả metric của đường được giữ và một bit \code{survivor\_select}. Với cấu hình mặc định \code{METRIC\_WIDTH=5}, hai phép cộng dùng tổng 6 bit.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.45\textheight,keepaspectratio]{Images/viterbi_acs.png}
+\caption{Một ACS với hai nhánh cộng bão hòa và một quyết định chọn đường}\label{fig:acs}
+\end{figure}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.7cm}c c Y@{}}\toprule
+\textbf{Cổng}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Ý nghĩa}\\\midrule
+\code{predecessor\_metric\_0}, \code{predecessor\_metric\_1}&Vào&5 mỗi cổng&Metric hai đường trước bước hiện tại.\\
+\code{branch\_metric\_0}, \code{branch\_metric\_1}&Vào&2 mỗi cổng&Khoảng cách nhánh của từng ứng viên.\\
+\code{survivor\_metric}&Ra&5&Metric nhỏ hơn sau bão hòa.\\
+\code{survivor\_select}&Ra&1&0 chọn candidate 0; 1 chọn candidate 1.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện một ACS ở cấu hình 5 bit}\label{tab:acs-ports}
+\end{table}
+Hai ứng viên tuân theo Phương trình~\ref{eq:metric}. Phép so sánh là không dấu và dùng điều kiện nghiêm ngặt $c_1<c_0$. Bit select phải được lưu cùng metric trong một bước, vì traceback dựa vào chính quyết định đã tạo ra metric đó.
+
+\subsubsection{Bão hòa và phân xử khi hòa}
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{Đường 0}&\textbf{Đường 1}&\textbf{$c_0$}&\textbf{$c_1$}&\textbf{Select / metric}\\\midrule
+$4+1$&$6+0$&5&6&0 / 5\\
+$7+2$&$3+1$&9&4&1 / 4\\
+$8+0$&$8+0$&8&8&0 / 8\\
+$30+2$&$29+2$&31&31&0 / 31\\
+$31+0$&$12+2$&31&14&1 / 14\\
+\bottomrule\end{tabular}
+\caption{Ví dụ chọn đường, xử lý hòa và giữ giá trị vô cực}\label{tab:acs-examples}
+\end{table}
+Hai hàng cuối làm rõ ý nghĩa bão hòa. Một predecessor chưa thể tới vẫn mang metric 31 sau khi cộng. Nếu cả hai candidate cùng 31, select bằng 0 nhưng trạng thái đích vẫn được xem là chưa thể tới. Khi có một candidate hữu hạn, candidate đó được chọn dù đường kia có branch metric bằng 0.
+
+Branch metric có bus rộng 2 bit nhưng BMU chỉ phát 0, 1 hoặc 2. Giá trị 3 có thể dùng để thử tính chịu tràn ở cấp cell, song không xuất hiện trong luồng chức năng của decoder. Các ví dụ chức năng trong Bảng~\ref{tab:acs-examples} đều dùng khoảng cách trong miền 0--2.
+
+\subsection{ACS unit -- Cập nhật bốn trạng thái song song}
+\subsubsection{Ánh xạ trellis vào bốn instance}
+\code{viterbi\_acs\_unit} gồm bốn instance ACS, mỗi instance trả một lát 5 bit của \code{next\_metrics}. Các đường nối cố định thể hiện trellis của mã $(7,5)_8$; khối không tự tính lại đa thức sinh khi chạy.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.48\textheight,keepaspectratio]{Images/viterbi_acs_unit.png}
+\caption{Bốn ACS nối song song theo các predecessor của từng trạng thái}\label{fig:acs-unit}
+\end{figure}
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{State đích}&\textbf{Predecessor 0}&\textbf{Predecessor 1}&\textbf{BM đường 0}&\textbf{BM đường 1}\\\midrule
+00&00&01&$d_{00}$&$d_{11}$\\01&10&11&$d_{10}$&$d_{01}$\\
+10&00&01&$d_{11}$&$d_{00}$\\11&10&11&$d_{01}$&$d_{10}$\\
+\bottomrule\end{tabular}
+\caption{Ánh xạ predecessor và khoảng cách nhánh trong ACS unit}\label{tab:acs-map}
+\end{table}
+Chẳng hạn, trạng thái đích 01 chỉ đến từ 10 hoặc 11 với bit vào 0. Hai symbol dự kiến lần lượt là 10 và 01, do đó ACS cho state 01 phải nhận $PM10+d_{10}$ và $PM11+d_{01}$. Đổi nhầm hai branch metric vẫn tạo các con số có vẻ hợp lệ nhưng sẽ giải mã sai trellis.
+
+\subsubsection{Giao diện và đóng gói bus}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.0cm}c c Y@{}}\toprule
+\textbf{Cổng}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Nội dung}\\\midrule
+\code{current\_metrics}&Vào&20&$\{PM11,PM10,PM01,PM00\}$.\\
+\code{distance\_00}, \code{distance\_01}&Vào&2 mỗi cổng&Khoảng cách do BMU tính.\\
+\code{distance\_10}, \code{distance\_11}&Vào&2 mỗi cổng&Khoảng cách do BMU tính.\\
+\code{next\_metrics}&Ra&20&Bốn metric mới, cùng thứ tự với bus vào.\\
+\code{survivor\_select}&Ra&4&Bit 0, 1, 2, 3 ứng với state 00, 01, 10, 11.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện ACS unit và thứ tự các kết quả}\label{tab:acs-unit-ports}
+\end{table}
+Ở bước đầu tiên, giả sử symbol nhận là 11. BMU trả $(d_{00},d_{01},d_{10},d_{11})=(2,1,1,0)$. Từ metric đầu $(0,31,31,31)$, bốn ACS trả $(2,31,0,31)$ theo thứ tự trạng thái 00, 01, 10, 11. Kết quả này đúng với trellis: từ state đầu 00 chỉ đi được tới 00 hoặc 10 sau một bit; hai state còn lại vẫn chưa thể tới.
+
+\subsection{Best-state -- Chọn điểm bắt đầu traceback}
+\code{viterbi\_best\_state} đọc bốn metric cuối, so sánh cặp 00/01 và cặp 10/11, sau đó so sánh hai giá trị thắng. Cấu trúc cây có hai tầng so sánh theo đường dữ liệu, thay cho ba phép so sánh nối tiếp.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.43\textheight,keepaspectratio]{Images/viterbi_best_state.png}
+\caption{Cây so sánh chọn trạng thái có path metric nhỏ nhất}\label{fig:best-state}
+\end{figure}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4cm}c c Y@{}}\toprule
+\textbf{Cổng}&\textbf{Hướng}&\textbf{Số bit}&\textbf{Ý nghĩa}\\\midrule
+\code{path\_metrics}&Vào&20&Metric theo thứ tự $\{PM11,PM10,PM01,PM00\}$.\\
+\code{best\_state}&Ra&2&Mã state có metric nhỏ nhất.\\
+\bottomrule\end{tabularx}
+\caption{Giao diện bộ chọn trạng thái cuối}\label{tab:best-ports}
+\end{table}
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{PM00}&\textbf{PM01}&\textbf{PM10}&\textbf{PM11}&\textbf{Best state}\\\midrule
+0&3&4&5&00\\4&1&2&3&01\\9&8&2&4&10\\9&8&7&3&11\\
+5&5&5&5&00\\8&2&2&7&01\\
+\bottomrule\end{tabular}
+\caption{Ví dụ chọn state cuối, gồm trường hợp hòa giữa hai nhánh cây}\label{tab:best-examples}
+\end{table}
+Mọi phép chọn đều chỉ đổi sang state có chỉ số lớn hơn khi metric của nó \emph{nhỏ hơn} nghiêm ngặt. Vì thế, nếu nhiều trạng thái cùng đạt metric nhỏ nhất, đầu ra là chỉ số nhỏ nhất. Không được thay quy tắc này bằng chọn tùy ý nếu muốn kết quả bit khớp mô hình tham chiếu trong các trường hợp hòa.
+
+Khối luôn tính theo bus metric hiện tại, kể cả khi khung chưa kết thúc. Chỉ giá trị được controller chốt trong SELECT\_FINAL\_STATE mới là state cuối của khung. Vì không có tail bit bắt buộc, không thể bỏ khối này và mặc định bắt đầu traceback từ 00.
+
+\section{SURVIVOR MEMORY VÀ TRACEBACK}
+\subsection{Từ quyết định ACS đến đường đi hoàn chỉnh}
+Sau bước $t$, hàng $M[t]$ lưu bốn quyết định cho các trạng thái $s_{t+1}$. Với state đích $j=(u,a)$, decision bằng 0 nghĩa là predecessor $(a,0)$; decision bằng 1 nghĩa là predecessor $(a,1)$. Bộ nhớ lưu quyết định chọn predecessor, không lưu trực tiếp bit thông tin $u$.
+
+Khi kết thúc pha tiến, mạch biết state cuối $s_8$. Ở mỗi bước truy vết $t=7,6,\ldots,0$, controller lấy $u_t=s_{t+1}[1]$, đọc $d_t=M[t][s_{t+1}]$, rồi tạo $s_t=\{s_{t+1}[0],d_t\}$. Lặp đủ tám lần sẽ nối các quyết định cục bộ thành một đường đi từ đầu đến cuối khung.
+
+Ví dụ, nếu state đang truy vết là 10 và decision bằng 1, bit thông tin là 1 và predecessor là 01. Bit 1 vừa khôi phục được ghi vào vị trí của bước hiện tại trước khi state đổi về 01. Cách đọc này bám trực tiếp vào quan hệ trạng thái trong Phương trình~\ref{eq:encoder}.
+
+\subsection{Thứ tự ghi trong pha truy vết}
+Pha truy vết đi ngược thời gian ở cả hai chế độ. Điều thay đổi theo \code{MSB\_FIRST} là vị trí đặt bit trong byte đầu ra:
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{Bước TB}&\textbf{Chỉ số}&\textbf{Bit tìm được}&\textbf{Vị trí LSB-first}&\textbf{Vị trí MSB-first}\\\midrule
+1&7&$u_7$&[7]&[0]\\2&6&$u_6$&[6]&[1]\\
+3&5&$u_5$&[5]&[2]\\4&4&$u_4$&[4]&[3]\\
+5&3&$u_3$&[3]&[4]\\6&2&$u_2$&[2]&[5]\\
+7&1&$u_1$&[1]&[6]\\8&0&$u_0$&[0]&[7]\\
+\bottomrule\end{tabular}
+\caption{Thứ tự khôi phục và vị trí ghi bit trong hai chế độ}\label{tab:tb-order}
+\end{table}
+Như vậy, trong MSB-first, bit thông tin đầu tiên theo thời gian là $u_0$ vẫn nằm ở [7], nhưng nó được khôi phục ở bước traceback cuối cùng. Trình tự ghi vật lý là [0] đến [7], không phải [7] về [0]. Tách rõ thứ tự truyền và thứ tự truy vết tránh nhầm lẫn khi kiểm tra waveform.
+
+\subsection{Ví dụ hoàn chỉnh với một khung không lỗi}
+Chọn \code{MSB\_FIRST=0}, dữ liệu gốc \code{8'h19} và từ mã nhận \code{16'h35FB}. Bảng~\ref{tab:worked-decode} dùng các metric và decision suy ra từ trellis và quy tắc hòa của RTL. Metric được trình bày theo thứ tự state tăng dần để dễ theo dõi; cột decision giữ thứ tự bus [3:0].
+\begin{table}[H]\centering\small
+\begin{tabular}{cccccc}\toprule
+\textbf{$t$}&\textbf{$u_t$}&\textbf{$r_t$}&\textbf{$s_{t+1}$ đúng}&\textbf{$(PM00,PM01,PM10,PM11)$}&\textbf{Decision [3:0]}\\\midrule
+0&1&11&10&$(2,31,0,31)$&0000\\
+1&0&10&01&$(3,0,3,2)$&0000\\
+2&0&11&00&$(0,3,2,3)$&1111\\
+3&1&11&10&$(2,3,0,3)$&0000\\
+4&1&01&11&$(3,2,3,0)$&0000\\
+5&0&01&01&$(3,0,3,2)$&1111\\
+6&0&11&00&$(0,3,2,3)$&1111\\
+7&0&00&00&$(0,3,2,3)$&0000\\
+\bottomrule\end{tabular}
+\caption{Cập nhật metric và survivor cho ví dụ \code{8'h19}}\label{tab:worked-decode}
+\end{table}
+Sau tám bước, state có metric nhỏ nhất được chọn để truy vết. Các bit được tìm theo thứ tự $u_7$ về $u_0$, sau đó nằm đúng vị trí trong byte đầu ra. Bảng~\ref{tab:worked-traceback} cho phép đối chiếu đồng thời địa chỉ đọc, decision và state kế tiếp.
+\begin{table}[H]\centering\small
+\begin{tabular}{ccccc}\toprule
+\textbf{Địa chỉ $t$}&\textbf{State trước bước}&\textbf{Decision đọc}&\textbf{Bit ghi vào [t]}&\textbf{Predecessor}\\\midrule
+7&00&0&0&00\\
+6&00&1&0&01\\
+5&01&1&0&11\\
+4&11&0&1&10\\
+3&10&0&1&00\\
+2&00&1&0&01\\
+1&01&0&0&10\\
+0&10&0&1&00\\
+\bottomrule\end{tabular}
+\caption{Truy vết tám bước của cùng khung ví dụ}\label{tab:worked-traceback}
+\end{table}
+Ở cạnh chốt bit tại địa chỉ 0, \code{decoded\_next=8'h19}; giá trị này được đưa ra \code{decoded\_data} cùng xung \code{done}. Với một khung có lỗi, lịch điều khiển và cách đọc bộ nhớ giữ nguyên; chỉ metric, decision và đường được chọn thay đổi.
+
+\section{KIỂM CHỨNG VÀ CÁC RÀNG BUỘC THIẾT KẾ}
+\subsection{Phương pháp kiểm chứng chức năng}
+Mô hình tham chiếu trong \code{scripts/run\_tests.py} tạo đủ 256 từ mã từ 256 byte thông tin, rồi tìm khoảng cách Hamming nhỏ nhất đối với từng từ nhận 16 bit. Cách kiểm tra này không dùng lại mạng trellis hoặc ACS của DUT, nên có thể phát hiện sai ánh xạ nhánh cũng như sai thuật toán cập nhật metric.
+
+Ngoài giá trị đầu ra, testbench cần kiểm tra giao thức: chỉ nhận khung khi IDLE, không lấy lại bus ngoài sau khi chốt, hoàn tất đúng cạnh $N+17$, \code{done} dài một chu kỳ và đầu ra giữ ổn định giữa hai lần hoàn tất. Reset được kích ở nhiều pha để kiểm tra hủy khung và phục hồi. Các trường hợp hòa phải so với quy tắc đã công bố, thay vì chấp nhận tùy ý một byte có cùng khoảng cách.
+
+\subsection{Ma trận yêu cầu cần kiểm tra}
+\small
+\begin{longtable}{@{}P{1.7cm}P{7.4cm}P{5.9cm}@{}}
+\caption{Yêu cầu kiểm chứng và cách quan sát}\label{tab:verification}\\
+\toprule\textbf{ID}&\textbf{Điều cần xác nhận}&\textbf{Phương pháp}\\\midrule\endfirsthead
+\toprule\textbf{ID}&\textbf{Điều cần xác nhận}&\textbf{Phương pháp}\\\midrule\endhead
+SYS-01&Khung 16 bit cho kết quả đúng theo khoảng cách Hamming nhỏ nhất.&So với codebook độc lập cho toàn bộ 65.536 từ nhận.\\
+SYS-02&Cả hai chế độ đóng gói bit hoạt động đúng.&Dùng hai DUT, vector không đối xứng và kiểm tra vị trí từng bit.\\
+SYS-03&Nhận khung ở cạnh $N$, trả kết quả ở $N+17$, nhận lại sớm nhất $N+18$.&Đếm cạnh; kiểm tra busy/done và start giữ cao.\\
+SYS-04&Start lúc busy không ghi đè khung; đổi bus ngoài không ảnh hưởng khung đã nhận.&Đổi start và encoded\_data trong DECODE/TRACEBACK.\\
+CTL-01&Metric đầu là $(0,31,31,31)$ ở mỗi khung.&Quan sát ngay sau reset và cạnh nhận start.\\
+CTL-02&Ghi đủ hàng survivor 0--7 trước TRACEBACK.&Kiểm tra địa chỉ ghi, số lần ghi và chuyển pha ở chỉ số 7.\\
+CTL-03&State cuối dùng metric của đủ tám symbol.&Đối chiếu metric sau $N+8$ với state chốt ở $N+9$.\\
+CTL-04&Không thiếu bit cuối khi chốt đầu ra.&Chọn vector có $u_0=1$; so decoded\_next và decoded\_data ở bước cuối.\\
+CTL-05&Reset hủy khung, xóa done/đầu ra; khung sau vẫn đúng.&Reset ở DECODE, SELECT\_FINAL\_STATE và TRACEBACK.\\
+BM-01&Bốn khoảng cách đúng và nằm trong 0--2.&Kiểm tra vét cạn bốn symbol theo Bảng~\ref{tab:bmu-truth}.\\
+ACS-01&Cộng mở rộng, bão hòa ở 31, không tràn về 0.&Vector quanh ngưỡng và predecessor bằng 31.\\
+ACS-02&Hòa chọn candidate 0; metric khớp decision.&Vector nhỏ hơn, lớn hơn và bằng nhau.\\
+AU-01&Bốn instance nhận đúng predecessor và branch metric.&So từng hàng Bảng~\ref{tab:acs-map} với mô hình tổ hợp.\\
+AU-02&Metric và decision đúng lát bus/state.&Đặt metric phân biệt, kiểm tra cả bốn đầu ra.\\
+BS-01&Chọn metric nhỏ nhất; hòa chọn state nhỏ nhất.&Đổi vị trí cực tiểu; kiểm tra hòa trong và giữa hai cặp.\\
+TB-01&Đọc đúng hàng và decision; ghép đủ tám bit.&So state/bit từng bước với truy vết tham chiếu.\\
+TB-02&Thứ tự ghi MSB-first là [0] đến [7] khi truy vết ngược.&Đối chiếu Bảng~\ref{tab:tb-order}.\\
+PHY-01&Đạt clock, diện tích, công suất trong công nghệ được giao.&Synthesis, STA và power analysis với ràng buộc đầy đủ.\\
+\bottomrule\end{longtable}
+\normalsize
+
+\subsection{Kết quả mô phỏng đã được lưu trong dự án}
+Thư mục \code{verification/} có log regression và tệp tổng hợp kết quả; tài liệu \code{VERIFICATION.md} ghi lần kiểm tra ngày 28/10/2026. Các số liệu trong Bảng~\ref{tab:existing-results} được trích từ các tệp này, không phải một lượt chạy RTL mới khi biên soạn báo cáo.
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{4.4cm}Y@{}}\toprule
+\textbf{Hạng mục}&\textbf{Kết quả đã ghi nhận}\\\midrule
+Không gian từ nhận&65.536 từ 16 bit; kiểm tra ở cả LSB-first và MSB-first.\\
+Khung sạch&Đủ 256 byte thông tin được kiểm tra.\\
+Reset và phục hồi&Năm trường hợp phục hồi sau khi hủy khung.\\
+Log testbench decoder&\code{PASS: 65797 frames in BOTH bit-order modes; all 65536 received words}.\\
+Giao tiếp bằng file&\code{PASS: 256 file vectors}; dữ liệu mẫu được sinh để thử.\\
+Dữ liệu chính thức của giảng viên&Chưa được kiểm tra theo tệp tổng hợp hiện có.\\
+PPA vật lý&Chưa được xác nhận.\\
+\bottomrule\end{tabularx}
+\caption{Kết quả chức năng có sẵn trong hồ sơ kiểm chứng}\label{tab:existing-results}
+\end{table}
+Các kết quả trên xác nhận phạm vi đã chạy theo log, không thay cho mọi phép kiểm tra cấp cell trong ma trận. Kiểm tra vét cạn từ nhận cũng không có nghĩa mạch sửa đúng mọi mẫu lỗi: điều được kiểm tra là nghiệm có khoảng cách nhỏ nhất và quy tắc phân xử hòa, kể cả khi nghiệm đó khác bản tin thực sự đã truyền.
+
+\subsection{Mục tiêu PPA và các đường cần phân tích timing}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.2cm}P{3.5cm}Y@{}}\toprule
+\textbf{Chỉ tiêu}&\textbf{Mục tiêu}&\textbf{Bằng chứng cần có}\\\midrule
+Tần số&$f_{clk}\ge200\ \mathrm{MHz}$&STA với clock 5 ns và đầy đủ ràng buộc IO, uncertainty.\\
+Diện tích&$\le7000\ \mu\mathrm{m}^2$&Báo cáo ánh xạ cell theo thư viện và flow được giao.\\
+Công suất&$\le1.5\ \mathrm{mW}$&Power analysis với điện áp, corner và hoạt động chuyển mạch xác định.\\
+\bottomrule\end{tabularx}
+\caption{Mục tiêu PPA cấp toàn thiết kế}\label{tab:ppa}
+\end{table}
+Vòng cập nhật metric gồm đường từ \code{path\_metrics} qua phép cộng, bão hòa, so sánh và MUX của ACS rồi quay về thanh ghi metric. Một nhánh đầu vào khác đi từ \code{encoded\_shift} qua BMU đến ACS. Cả hai cần được kiểm tra; chưa có báo cáo STA để kết luận nhánh nào là critical path thực tế.
+
+Pha chọn state có đường từ thanh ghi metric qua cây so sánh hai tầng đến \code{traceback\_state}. Pha traceback có đường từ chỉ số và state qua mạng chọn hàng/bit survivor, rồi quay về state hoặc tới logic ghi bit. Dù bộ nhớ chỉ có 32 bit, các MUX chọn động vẫn đóng góp độ trễ. Thời gian thiết lập, clock-to-Q, skew và tải dây phải được tính trong ngân sách 5 ns.
+
+Tệp \code{constraints/viterbi\_decoder.sdc} đặt clock mục tiêu 5 ns. Khi chạy flow vật lý cần bổ sung điều kiện IO, tải, driving cell, uncertainty và xử lý reset phù hợp. Clock 5 ns trong mô phỏng chỉ kiểm tra lịch giao thức; các chỉ tiêu tần số, diện tích và công suất chỉ được kết luận sau khi có báo cáo tương ứng.
+
+\section{KẾT LUẬN}
+Bộ giải mã sử dụng bốn ACS song song để xử lý trellis bốn trạng thái, lưu 32 bit quyết định survivor và truy vết đủ tám bước cho mỗi khung. Controller bảo đảm các kết quả metric được lưu cùng decision, state cuối được chọn sau lần cập nhật thứ tám và byte đầu ra chỉ thay đổi khi đã ghép đủ tám bit.
+
+Giao diện có thời gian xử lý cố định: nhận khung ở IDLE, trả kết quả sau 17 chu kỳ và có thể nhận khung tiếp theo sau 18 chu kỳ. Hai chế độ đóng gói dữ liệu dùng chung thuật toán và FSM; sự khác biệt nằm ở đầu lấy symbol và vị trí ghi bit trong bộ đệm. Đây là các quy ước cần giữ thống nhất giữa encoder, decoder và testbench khi tích hợp.
+
+Hồ sơ dự án đã có kết quả kiểm chứng chức năng trên toàn bộ không gian từ nhận 16 bit ở hai chế độ. Công việc còn lại ở mức triển khai là xác nhận timing, diện tích và công suất với thư viện công nghệ và điều kiện hoạt động cụ thể.
+
+\begin{thebibliography}{9}
+\raggedright
+\addcontentsline{toc}{section}{TÀI LIỆU THAM KHẢO}
+\bibitem{rtl} Nhóm thiết kế, các module trong \code{src/}: \code{viterbi\_decoder.v}, \code{viterbi\_control.v}, \code{viterbi\_branch\_metrics.v}, \code{viterbi\_acs\_unit.v}, \code{viterbi\_acs.v}, \code{viterbi\_best\_state.v}.
+\bibitem{figures} Nhóm thiết kế, sơ đồ kiến trúc và FSM trong \code{Image/}, gồm \emph{Controller Overview} và \emph{controller datapath}.
+\bibitem{verification} Nhóm thiết kế, \code{VERIFICATION.md}; \code{verification/tb\_viterbi\_decoder.log}, \code{tb\_viterbi\_files.log} và \code{verification\_summary.json}; kết quả kiểm tra được ghi ngày 28/10/2026.
+\bibitem{reference-model} Nhóm thiết kế, mô hình tham chiếu và testbench: \code{scripts/run\_tests.py}, \code{tb/tb\_viterbi\_decoder.sv}, \code{tb/tb\_viterbi\_files.sv}.
+\bibitem{previous-report} Nhóm thiết kế, \emph{Báo cáo bài tập lớn Viterbi Decoder}, bản báo cáo tháng 10/2026, \code{VLSI\_report.pdf}.
+\end{thebibliography}
+
+\clearpage\appendix
+\section{CÁC VÙNG PHÓNG TO CỦA CONTROLLER DATAPATH}\label{sec:zoom}
+Các hình dưới giữ nguyên nội dung của sơ đồ datapath và chỉ thay đổi vùng hiển thị để đọc rõ các nhãn nhỏ. Dấu K1--K9 thống nhất với phần giải thích trong Mục 4. Sơ đồ thể hiện LSB-first; khi dùng MSB-first, đường dịch của K1 và vị trí ghi của K7 thay đổi theo quy ước đã nêu.
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,trim=0bp 1958bp 3568bp 90bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K1--K2: thanh ghi khung và thanh ghi path metric}\label{fig:zoom-input}
+\end{figure}
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,trim=1570bp 2308bp 918bp 95bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K3--K4: bộ đếm symbol và chỉ số traceback}\label{fig:zoom-counters}
+\end{figure}
+\clearpage
+\begin{figure}[H]\centering
+\includegraphics[width=.94\textwidth,height=.83\textheight,keepaspectratio,trim=5bp 914bp 3178bp 910bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K5: ghi bốn decision và chọn decision khi truy vết}\label{fig:zoom-survivor}
+\end{figure}
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,trim=1940bp 1294bp 1858bp 910bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K6: nạp state cuối và chuyển về predecessor}\label{fig:zoom-tbstate}
+\end{figure}
+\clearpage
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,height=.83\textheight,keepaspectratio,trim=3250bp 924bp 5bp 490bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K7--K8: chọn vị trí bit, bộ đệm và thanh ghi đầu ra}\label{fig:zoom-output}
+\end{figure}
+\clearpage
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth,trim=1700bp 0bp 1278bp 1950bp,clip]{Images/controller_datapath.png}
+\par\vspace{16pt}
+\includegraphics[width=\textwidth,trim=3300bp 0bp 0bp 1950bp,clip]{Images/controller_datapath.png}
+\caption{Phóng to K9: hai vùng của mạng điều kiện cập nhật thanh ghi, với phần giao nhau để theo dõi đường nối}\label{fig:zoom-control}
+\end{figure}
+Các cờ trạng thái từ FSM đi vào mạng điều khiển ở hình trên; hình dưới cho thấy phần điều khiển bộ đếm, thanh ghi \code{done} và phép giải mã \code{busy}. Các đường cùng nhãn thuộc cùng một kết nối. Điều kiện của từng nhóm thanh ghi được đối chiếu trong Bảng~\ref{tab:enables}; sơ đồ FSM riêng ở Hình~\ref{fig:fsm} cho biết cách tạo các pha tương ứng.
+\end{document}
