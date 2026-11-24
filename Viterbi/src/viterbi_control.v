@@ -8,17 +8,16 @@ module viterbi_control #(
     parameter MSB_FIRST = 0
 ) (
     input  wire clk,
-    input  wire reset,
-    input  wire start,
-    input  wire [15:0] encoded_data,
+    input  wire rstn,
+    input  wire viterbi_enable,
+    input  wire [15:0] input_data,
     input  wire [19:0] next_metrics,
     input  wire [3:0] survivor_select,
     input  wire [1:0] best_state,
     output wire [1:0] received_symbol,
     output reg [19:0] path_metrics,
-    output wire busy,
-    output reg done,
-    output reg [7:0] decoded_data
+    output reg output_done,
+    output reg [7:0] output_data
 );
     localparam [1:0] IDLE = 2'd0, DECODE = 2'd1,
                      SELECT_FINAL_STATE = 2'd2, TRACEBACK = 2'd3;
@@ -38,7 +37,6 @@ module viterbi_control #(
     wire predecessor_older_bit = survivor_memory[traceback_index][traceback_state];
 
     assign received_symbol = MSB_FIRST ? encoded_shift[15:14] : encoded_shift[1:0];
-    assign busy = (control_state != IDLE);
 
     always @* begin
         decoded_next = decoded_work;
@@ -49,8 +47,8 @@ module viterbi_control #(
             decoded_next[traceback_index] = traceback_state[1];
     end
 
-    always @(posedge clk or posedge reset) begin
-        if (reset) begin
+    always @(posedge clk or negedge rstn) begin
+        if (!rstn) begin
             control_state <= IDLE;
             encoded_shift <= 16'd0;
             path_metrics <= INITIAL_METRICS;
@@ -58,17 +56,17 @@ module viterbi_control #(
             traceback_state <= 2'd0;
             traceback_index <= 3'd0;
             decoded_work <= 8'd0;
-            decoded_data <= 8'd0;
-            done <= 1'b0;
+            output_data <= 8'd0;
+            output_done <= 1'b0;
             // Survivor RAM needs no reset: all eight entries are overwritten
             // before any traceback read, including after an aborted frame.
         end else begin
-            done <= 1'b0;
+            output_done <= 1'b0;
             case (control_state)
                 IDLE: begin
-                    // Accept one complete frame only when busy is low.
-                    if (start) begin
-                        encoded_shift <= encoded_data;
+                    // Accept one complete frame only in IDLE.
+                    if (viterbi_enable) begin
+                        encoded_shift <= input_data;
                         path_metrics <= INITIAL_METRICS;
                         symbol_index <= 3'd0;
                         decoded_work <= 8'd0;
@@ -95,8 +93,8 @@ module viterbi_control #(
                     decoded_work <= decoded_next;
                     traceback_state <= {traceback_state[0], predecessor_older_bit};
                     if (traceback_index == 3'd0) begin
-                        decoded_data <= decoded_next;
-                        done <= 1'b1;
+                        output_data <= decoded_next;
+                        output_done <= 1'b1;
                         control_state <= IDLE;
                     end else begin
                         traceback_index <= traceback_index - 3'd1;

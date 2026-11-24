@@ -3,19 +3,18 @@
 
 // Structural top: K=3, rate=1/2, generators (7,5) octal.
 // All state, storage and frame sequencing are owned by viterbi_control.
-module viterbi_decoder #(
-    // 0 matches the PDF example: first symbol is encoded_data[1:0],
-    // and the first recovered information bit becomes decoded_data[0].
-    // 1 processes encoded_data[15:14] first and writes decoded_data[7] first.
+module viterbi_top #(
+    // 0 matches the PDF example: first symbol is input_data[1:0],
+    // and the first recovered information bit becomes output_data[0].
+    // 1 processes input_data[15:14] first and writes output_data[7] first.
     parameter MSB_FIRST = 0
 ) (
     input  wire clk,
-    input  wire reset,
-    input  wire start,
-    input  wire [15:0] encoded_data,
-    output wire busy,
-    output wire done,
-    output wire [7:0] decoded_data
+    input  wire rstn,
+    input  wire viterbi_enable,
+    input  wire [15:0] input_data,
+    output wire [7:0] output_data,
+    output wire output_done
 );
     wire [1:0] received_symbol;
     wire [19:0] path_metrics;
@@ -25,11 +24,11 @@ module viterbi_decoder #(
     wire [1:0] best_state;
 
     viterbi_control #(.MSB_FIRST(MSB_FIRST)) control (
-        .clk(clk), .reset(reset), .start(start), .encoded_data(encoded_data),
+        .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(input_data),
         .next_metrics(next_metrics), .survivor_select(survivor_select),
         .best_state(best_state), .received_symbol(received_symbol),
-        .path_metrics(path_metrics), .busy(busy), .done(done),
-        .decoded_data(decoded_data)
+        .path_metrics(path_metrics), .output_done(output_done),
+        .output_data(output_data)
     );
 
     viterbi_branch_metrics branch_metrics (

@@ -35,30 +35,29 @@ bằng (hòa thì chọn số trạng thái nhỏ hơn). Truy vết đủ 8 bư�
 
 ## Phân chia module
 
-`viterbi_decoder.v` chỉ khai báo dây nối và instantiate bốn module con:
+`viterbi_top.v` chỉ khai báo dây nối và instantiate bốn module con:
 `viterbi_control`, `viterbi_branch_metrics`, `viterbi_acs_unit` và
 `viterbi_best_state`. Top không chứa FSM, thanh ghi hoặc khối `always`.
 
 `viterbi_control.v` quản lý FSM, thanh ghi đầu vào, path metric, survivor
 memory, truy vết và thanh ghi đầu ra. Khối này cấp cặp nhận/metric hiện tại
 cho datapath và chốt kết quả ACS. Cách tách module không thêm thanh ghi,
-không đổi cổng ngoài hoặc độ trễ giải mã.
+giữ nguyên độ trễ giải mã. Giao tiếp top hiện dùng đúng sáu cổng của đề.
 
-## Giao tiếp top `viterbi_decoder`
+## Giao tiếp top `viterbi_top`
 
 | Cổng | Chiều | Ý nghĩa |
 | --- | --- | --- |
 | clk | vào | Clock cạnh lên |
-| reset | vào | Reset bất đồng bộ, tích cực mức 1 |
-| start | vào | Chấp nhận khung tại cạnh lên nếu busy=0 |
-| encoded_data[15:0] | vào | Toàn bộ khung; được chốt lúc chấp nhận start |
-| busy | ra | Mức 1 trong khi đang giải mã/truy vết |
-| done | ra | Xung 1 chu kỳ khi decoded_data hợp lệ |
-| decoded_data[7:0] | ra | Kết quả; giữ ổn định đến kết quả kế tiếp hoặc reset |
+| rstn | vào | Reset bất đồng bộ, tích cực mức 0 |
+| viterbi_enable | vào | Chấp nhận khung tại cạnh lên khi FSM ở IDLE |
+| input_data[15:0] | vào | Toàn bộ khung; được chốt lúc chấp nhận viterbi_enable |
+| output_data[7:0] | ra | Kết quả; giữ ổn định đến kết quả kế tiếp hoặc khi rstn=0 |
+| output_done | ra | Xung 1 chu kỳ khi output_data hợp lệ |
 
-`start` trong lúc `busy=1` bị bỏ qua. Đầu vào có thể đổi sau cạnh nhận khung.
-Nếu giữ `start=1`, một khung mới sẽ được chấp nhận ở cạnh đầu tiên sau khi
-busy về 0. Reset hủy khung đang xử lý, xóa done và kết quả. Các khung độc lập:
+`viterbi_enable` trong lúc đang xử lý khung bị bỏ qua. Đầu vào có thể đổi sau cạnh nhận khung.
+Nếu giữ `viterbi_enable=1`, một khung mới sẽ được chấp nhận ở cạnh đầu tiên sau khi
+FSM trở về IDLE (cạnh sau xung `output_done`). `rstn=0` hủy khung đang xử lý, xóa output_done và kết quả. Các khung độc lập:
 trạng thái mã hóa được giả định trở về 00 ở đầu mỗi khung.
 
 Nếu nhận khung ở cạnh N:
@@ -68,7 +67,7 @@ Nếu nhận khung ở cạnh N:
 | N | Chốt dữ liệu và khởi tạo metric |
 | N+1 đến N+8 | Tính BM/ACS, lưu survivor |
 | N+9 | Chọn trạng thái cuối |
-| N+10 đến N+17 | Truy vết; phát done tại N+17 |
+| N+10 đến N+17 | Truy vết; phát output_done tại N+17 |
 | N+18 | Có thể nhận khung tiếp theo |
 
 Độ trễ là 17 chu kỳ sau cạnh nhận khung; khoảng cách nhận khung tối thiểu
@@ -79,8 +78,8 @@ toán theo giao thức, không phải kết quả đo timing vật lý.
 
 Mặc định `MSB_FIRST=0`, theo ví dụ tài liệu đọc cặp ở phía phải trước:
 
-- Bit thông tin đầu tiên là decoded_data[0].
-- Cặp nhận đầu tiên là encoded_data[1:0], sau đó [3:2], ..., [15:14].
+- Bit thông tin đầu tiên là output_data[0].
+- Cặp nhận đầu tiên là input_data[1:0], sau đó [3:2], ..., [15:14].
 - Trong mỗi cặp `{v1,v2}`, v1 ở bit cao và v2 ở bit thấp.
 
 Ví dụ của tài liệu: dữ liệu 6 bit `011001` được đọc theo thời gian là
@@ -97,7 +96,7 @@ có cách đóng gói cặp khác hoặc giữ trạng thái liên tục qua cá
 
 | File cũ | File mới / thay đổi |
 | --- | --- |
-| bVITERBI_213.v | src/viterbi_decoder.v: top cấu trúc, nối các module con |
+| bVITERBI_213.v | src/viterbi_top.v: top cấu trúc, nối các module con |
 | bBMU_213.v | src/viterbi_branch_metrics.v: dùng chung 4 khoảng cách Hamming |
 | bACS_213.v | src/viterbi_acs.v: ACS tổ hợp, cộng bão hòa, hòa xác định |
 | bACSU_213.v | src/viterbi_acs_unit.v: 4 ACS, trellis đúng cho (7,5) |
@@ -113,7 +112,10 @@ thử trong workspace đang mở, sau đó đồng bộ về dự án gốc ở 
 ban đầu chưa có src, Git hiển thị các file mới thay vì một diff đổi tên.
 
 Đây là thay đổi giao tiếp top: cần sửa nơi instantiate module cũ. Không còn
-Rx 2 bit, Dx 1 bit, oe, seq_ready hoặc sync_error. `done` báo kết quả đã có,
+Rx 2 bit, Dx 1 bit, oe, seq_ready hoặc sync_error. `busy` đã được bỏ khỏi top và controller: đây chỉ là cờ trạng thái,
+không quyết định việc nhận khung. Sau khi nhả reset hoặc thấy `output_done=1`,
+bên gửi đặt dữ liệu và phát enable; dữ liệu khung mới được chốt tại cạnh lên
+kế tiếp khi FSM ở IDLE. `output_done` báo kết quả đã có,
 không phải chứng nhận đã sửa đúng mọi lỗi kênh. Khi có nhiều bản tin gần
 nhất như nhau, bộ giải mã trả một nghiệm theo quy tắc hòa đã định.
 
@@ -140,7 +142,8 @@ Testbench kiểm tra:
 
 - Tất cả 65.536 từ nhận, gồm cả dữ liệu lỗi và trường hợp hòa, ở cả hai thứ tự bit.
 - Cả 256 bản tin sạch và ví dụ mã hóa trong tài liệu.
-- Start khi busy, thay đổi bus sau chốt, độ trễ, xung done, giữ kết quả.
+- Enable khi đang xử lý, thay đổi bus sau chốt, độ trễ, xung output_done, giữ kết quả.
+- Giữ enable qua thời điểm hoàn tất: nhận khung kế tiếp tại N+18.
 - Reset giữa giải mã, chọn trạng thái cuối và truy vết; khung tiếp theo phải đúng.
 - Giao tiếp file với 256 cặp dữ liệu mẫu sinh riêng trong build/.
 
@@ -161,12 +164,12 @@ File log và verification_summary.json nằm trong build/. Dữ liệu mẫu kh�
 
 ## Tổng hợp và PPA
 
-Danh sách RTL: src/files.f. Top: viterbi_decoder. Tất cả module trong src/
+Danh sách RTL: src/files.f. Top: viterbi_top. Tất cả module trong src/
 đều dùng RTL tổng hợp được, không có delay, initial hoặc tri-state nội bộ.
 Để tổng hợp chỉ nạp các file RTL, không nạp tb/.
 
-constraints/viterbi_decoder.sdc đặt clock 5 ns (200 MHz). Phải bổ sung I/O
-delay, tải, driving cell, clock uncertainty và ràng buộc reset theo flow thực tế.
+constraints/viterbi_top.sdc đặt clock 5 ns (200 MHz). Phải bổ sung I/O
+delay, tải, driving cell, clock uncertainty và ràng buộc rstn theo flow thực tế.
 Không đặt false path rộng để che đường timing của dữ liệu.
 
 Các yêu cầu f >= 200 MHz, diện tích <= 7000 um^2, công suất <= 1.5 mW cần

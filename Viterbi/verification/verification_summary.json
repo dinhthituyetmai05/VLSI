@@ -6,6 +6,7 @@
   ],
   "clean_messages": 256,
   "reset_abort_recovery_cases": 5,
+  "held_enable_frames": 2,
   "synthetic_file_vectors": 256,
   "teacher_vectors_tested": false,
   "physical_PPA_verified": false

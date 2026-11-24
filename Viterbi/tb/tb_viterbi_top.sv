@@ -1,14 +1,14 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-module tb_viterbi_decoder;
+module tb_viterbi_top;
     reg clk = 0;
     always #2.5 clk = ~clk;
-    reg reset = 1;
-    reg start = 0;
-    reg [15:0] encoded_data = 0;
-    wire busy, done, busy_msb, done_msb;
-    wire [7:0] decoded_data, decoded_msb;
+    reg rstn = 0;
+    reg viterbi_enable = 0;
+    reg [15:0] input_data = 0;
+    wire output_done, done_msb;
+    wire [7:0] output_data, decoded_msb;
     integer checked = 0;
     integer vector_file, scan_result, received, golden, index;
     string vector_path;
@@ -38,13 +38,13 @@ module tb_viterbi_decoder;
         end
     endfunction
 
-    viterbi_decoder dut (
-        .clk(clk), .reset(reset), .start(start), .encoded_data(encoded_data),
-        .busy(busy), .done(done), .decoded_data(decoded_data)
+    viterbi_top dut (
+        .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(input_data),
+        .output_done(output_done), .output_data(output_data)
     );
-    viterbi_decoder #(.MSB_FIRST(1)) dut_msb (
-        .clk(clk), .reset(reset), .start(start), .encoded_data(reverse_pairs(encoded_data)),
-        .busy(busy_msb), .done(done_msb), .decoded_data(decoded_msb)
+    viterbi_top #(.MSB_FIRST(1)) dut_msb (
+        .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(reverse_pairs(input_data)),
+        .output_done(done_msb), .output_data(decoded_msb)
     );
 
     task automatic check_frame(input [15:0] frame, input [7:0] expected);
@@ -52,52 +52,78 @@ module tb_viterbi_decoder;
         reg [7:0] previous_output;
         begin
             @(negedge clk);
-            previous_output = decoded_data;
-            start = 1;
-            encoded_data = frame;
+            previous_output = output_data;
+            viterbi_enable = 1;
+            input_data = frame;
             @(posedge clk); #0.1;
-            if (busy !== 1 || done !== 0) $fatal(1, "Frame not accepted");
+            if (output_done !== 0) $fatal(1, "Frame not accepted");
             for (cycle = 1; cycle <= 17; cycle = cycle + 1) begin
                 @(negedge clk);
-                // Change the bus and attempt a second start while busy.
-                encoded_data = ~frame;
-                start = (cycle == 3);
+                // Change the bus and attempt a second enable during decoding.
+                input_data = ~frame;
+                viterbi_enable = (cycle == 3);
                 @(posedge clk); #0.1;
-                if (busy_msb !== busy || done_msb !== done)
+                if (done_msb !== output_done)
                     $fatal(1, "Bit-order modes have different timing");
                 if (cycle < 17) begin
-                    if (busy !== 1 || done !== 0 || decoded_data !== previous_output)
+                    if (output_done !== 0 || output_data !== previous_output)
                         $fatal(1, "Early completion/output change at cycle %0d", cycle);
                 end else begin
-                    if (busy !== 0 || done !== 1 || decoded_data !== expected ||
+                    if (output_done !== 1 || output_data !== expected ||
                         decoded_msb !== reverse_bits(expected))
                         $fatal(1, "frame=%04h expected=%02h got=%02h msb=%02h",
-                               frame, expected, decoded_data, decoded_msb);
+                               frame, expected, output_data, decoded_msb);
                 end
             end
-            @(negedge clk); start = 0;
+            @(negedge clk); viterbi_enable = 0;
             @(posedge clk); #0.1;
-            if (done !== 0 || busy !== 0 || decoded_data !== expected ||
+            if (output_done !== 0 || output_data !== expected ||
                 done_msb !== 0 || decoded_msb !== reverse_bits(expected))
-                $fatal(1, "done must pulse once and result must remain stable");
+                $fatal(1, "output_done must pulse once and result must remain stable");
             checked = checked + 1;
+        end
+    endtask
+
+    task automatic check_held_enable;
+        integer cycle;
+        reg [7:0] previous_output, expected_output;
+        begin
+            @(negedge clk);
+            previous_output = output_data;
+            input_data = encode(8'h3c);
+            viterbi_enable = 1;
+            @(posedge clk); #0.1;
+            for (cycle = 1; cycle <= 36; cycle = cycle + 1) begin
+                @(negedge clk);
+                // Hold enable across completion; frame two is accepted at N+18.
+                input_data = encode(8'ha5);
+                viterbi_enable = (cycle <= 18);
+                @(posedge clk); #0.1;
+                expected_output = (cycle < 17) ? previous_output :
+                                  (cycle < 35) ? 8'h3c : 8'ha5;
+                if (output_done !== ((cycle == 17) || (cycle == 35)) ||
+                    done_msb !== output_done || output_data !== expected_output ||
+                    decoded_msb !== reverse_bits(expected_output))
+                    $fatal(1, "Held-enable protocol failed at cycle %0d", cycle);
+            end
+            checked = checked + 2;
         end
     endtask
 
     task automatic abort_frame(input integer delay_cycles);
         begin
-            @(negedge clk); encoded_data = 16'hffff; start = 1;
-            @(negedge clk); start = 0;
+            @(negedge clk); input_data = 16'hffff; viterbi_enable = 1;
+            @(negedge clk); viterbi_enable = 0;
             repeat (delay_cycles) @(negedge clk);
-            reset = 1;
+            rstn = 0;
             #0.1;
-            if (busy !== 0 || done !== 0 || decoded_data !== 0 ||
-                busy_msb !== 0 || done_msb !== 0 || decoded_msb !== 0)
-                $fatal(1, "Asynchronous reset did not cancel the frame");
-            @(negedge clk); reset = 0;
+            if (output_done !== 0 || output_data !== 0 ||
+                done_msb !== 0 || decoded_msb !== 0)
+                $fatal(1, "Asynchronous active-low reset did not cancel the frame");
+            @(negedge clk); rstn = 1;
             repeat (2) begin
                 @(posedge clk); #0.1;
-                if (done !== 0 || busy !== 0 || done_msb !== 0 || busy_msb !== 0)
+                if (output_done !== 0 || done_msb !== 0)
                     $fatal(1, "Aborted frame produced a stale completion");
             end
             check_frame(encode(8'h96), 8'h96);
@@ -106,7 +132,7 @@ module tb_viterbi_decoder;
 
     initial begin
         repeat (2) @(negedge clk);
-        reset = 0;
+        rstn = 1;
         // PDF's six-bit example, padded with two additional data zeros.
         if (encode(8'h19) !== 16'h35fb) $fatal(1, "Encoder convention mismatch");
         for (index = 0; index < 256; index = index + 1)
@@ -116,6 +142,7 @@ module tb_viterbi_decoder;
         abort_frame(8);
         abort_frame(12);
         abort_frame(15);
+        check_held_enable();
 
         if (!$value$plusargs("VECTORS=%s", vector_path))
             $fatal(1, "Supply +VECTORS=<independent oracle file>");

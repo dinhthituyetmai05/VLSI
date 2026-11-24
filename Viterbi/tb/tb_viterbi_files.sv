@@ -7,18 +7,18 @@ module tb_viterbi_files;
     parameter MSB_FIRST = 0;
     reg clk = 0;
     always #2.5 clk = ~clk;
-    reg reset = 1, start = 0;
-    reg [15:0] encoded_data = 0;
-    wire busy, done;
-    wire [7:0] decoded_data;
+    reg rstn = 0, viterbi_enable = 0;
+    reg [15:0] input_data = 0;
+    wire output_done;
+    wire [7:0] output_data;
     integer encoded_file, expected_file, encoded_status, expected_status;
     integer count = 0, cycle;
     reg [7:0] expected_data;
     string encoded_path, expected_path, encoded_word, expected_word;
 
-    viterbi_decoder #(.MSB_FIRST(MSB_FIRST)) dut (
-        .clk(clk), .reset(reset), .start(start), .encoded_data(encoded_data),
-        .busy(busy), .done(done), .decoded_data(decoded_data)
+    viterbi_top #(.MSB_FIRST(MSB_FIRST)) dut (
+        .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(input_data),
+        .output_done(output_done), .output_data(output_data)
     );
 
     function automatic bit valid_binary(input string word, input integer width);
@@ -38,7 +38,7 @@ module tb_viterbi_files;
         expected_file = $fopen(expected_path, "r");
         if (!encoded_file || !expected_file) $fatal(1, "Cannot open input/output vector files");
         repeat (2) @(negedge clk);
-        reset = 0;
+        rstn = 1;
         forever begin
             encoded_status = $fscanf(encoded_file, "%s", encoded_word);
             expected_status = $fscanf(expected_file, "%s", expected_word);
@@ -54,17 +54,17 @@ module tb_viterbi_files;
             if (!valid_binary(encoded_word, 16) || !valid_binary(expected_word, 8))
                 $fatal(1, "Invalid binary vector at row %0d", count + 1);
             @(negedge clk);
-            encoded_status = $sscanf(encoded_word, "%b", encoded_data);
+            encoded_status = $sscanf(encoded_word, "%b", input_data);
             expected_status = $sscanf(expected_word, "%b", expected_data);
-            start = 1;
-            @(negedge clk); start = 0;
+            viterbi_enable = 1;
+            @(negedge clk); viterbi_enable = 0;
             for (cycle = 0; cycle < 17; cycle = cycle + 1) begin
                 @(posedge clk); #0.1;
-                if (cycle < 16 && done !== 0) $fatal(1, "Early done");
+                if (cycle < 16 && output_done !== 0) $fatal(1, "Early output_done");
             end
-            if (done !== 1 || busy !== 0 || decoded_data !== expected_data)
+            if (output_done !== 1 || output_data !== expected_data)
                 $fatal(1, "row=%0d encoded=%b expected=%b got=%b",
-                       count + 1, encoded_data, expected_data, decoded_data);
+                       count + 1, input_data, expected_data, output_data);
             count = count + 1;
         end
     end

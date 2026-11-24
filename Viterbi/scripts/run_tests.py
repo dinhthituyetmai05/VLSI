@@ -60,7 +60,7 @@ def main() -> None:
     expected_path.write_text("".join(f"{message:08b}\n" for message in range(256)), encoding="ascii")
     rtl = [line for line in (ROOT / "src/files.f").read_text().splitlines() if line]
     for top, source, plusargs in [
-        ("tb_viterbi_decoder", "tb/tb_viterbi_decoder.sv", [f"+VECTORS={oracle_path.as_posix()}"]),
+        ("tb_viterbi_top", "tb/tb_viterbi_top.sv", [f"+VECTORS={oracle_path.as_posix()}"]),
         ("tb_viterbi_files", "tb/tb_viterbi_files.sv",
          [f"+ENCODED={encoded_path.as_posix()}", f"+EXPECTED={expected_path.as_posix()}"]),
     ]:
@@ -77,6 +77,7 @@ def main() -> None:
         "bit_orders_tested": ["LSB first", "MSB first"],
         "clean_messages": 256,
         "reset_abort_recovery_cases": 5,
+        "held_enable_frames": 2,
         "synthetic_file_vectors": 256,
         "teacher_vectors_tested": bool(args.encoded),
         "physical_PPA_verified": False,
