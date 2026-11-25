@@ -12,11 +12,11 @@ def encode(message: int) -> int:
     """Polynomial definition, independent of the decoder's state/ACS implementation."""
     word = 0
     for t in range(8):
-        current = (message >> t) & 1
-        previous = (message >> (t - 1)) & 1 if t >= 1 else 0
-        older = (message >> (t - 2)) & 1 if t >= 2 else 0
-        word |= (current ^ previous ^ older) << (2 * t + 1)
-        word |= (current ^ older) << (2 * t)
+        current = (message >> (7 - t)) & 1
+        previous = (message >> (8 - t)) & 1 if t >= 1 else 0
+        older = (message >> (9 - t)) & 1 if t >= 2 else 0
+        word |= (current ^ previous ^ older) << (15 - 2 * t)
+        word |= (current ^ older) << (14 - 2 * t)
     return word
 
 
@@ -45,13 +45,14 @@ def main() -> None:
     build.mkdir(exist_ok=True)
     codebook = [encode(message) for message in range(256)]
     assert len(set(codebook)) == 256
-    # Equal-distance tie rule: smallest information byte. With LSB-first data,
-    # the RTL's lower predecessor/final-state rule gives exactly this ordering.
+    # Equal-distance ties favor the smaller time-reversed information byte.
+    # Enumerate that order without sharing the DUT trellis or ACS logic.
+    tie_order = sorted(range(256), key=lambda m: int(f"{m:08b}"[::-1], 2))
     print("Generating oracle by exhaustive search over all 256 codewords...")
     oracle_path = build / "oracle.hex"
     with oracle_path.open("w", encoding="ascii") as oracle:
         for received in range(65536):
-            message = min(range(256), key=lambda m: (received ^ codebook[m]).bit_count())
+            message = min(tie_order, key=lambda m: (received ^ codebook[m]).bit_count())
             oracle.write(f"{received:04x} {message:02x}\n")
     # Synthetic file fixtures are explicitly separate from the teacher's files.
     encoded_path = build / "sample_output.txt"
@@ -74,7 +75,7 @@ def main() -> None:
              f"+EXPECTED={args.expected.resolve().as_posix()}"], build / "teacher_vectors.log")
     summary = {
         "exhaustive_received_words": 65536,
-        "bit_orders_tested": ["LSB first", "MSB first"],
+        "bit_orders_tested": ["fixed MSB first"],
         "clean_messages": 256,
         "reset_abort_recovery_cases": 5,
         "held_enable_frames": 2,
