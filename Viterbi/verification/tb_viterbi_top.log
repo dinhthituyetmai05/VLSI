@@ -1,2 +1,2 @@
-PASS: 65799 frames in BOTH bit-order modes; all 65536 received words
-tb/tb_viterbi_top.sv:161: $finish called at 6251227600 (1ps)
+PASS: 65799 frames in fixed MSB-first order; all 65536 received words
+tb/tb_viterbi_top.sv:141: $finish called at 6251227600 (1ps)

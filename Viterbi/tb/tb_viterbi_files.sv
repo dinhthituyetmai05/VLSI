@@ -4,7 +4,6 @@
 // Run from the project root. Files contain one binary word per nonblank line.
 // output.txt: 16 encoded bits; input.txt: 8 expected information bits.
 module tb_viterbi_files;
-    parameter MSB_FIRST = 0;
     reg clk = 0;
     always #2.5 clk = ~clk;
     reg rstn = 0, viterbi_enable = 0;
@@ -16,7 +15,7 @@ module tb_viterbi_files;
     reg [7:0] expected_data;
     string encoded_path, expected_path, encoded_word, expected_word;
 
-    viterbi_top #(.MSB_FIRST(MSB_FIRST)) dut (
+    viterbi_top dut (
         .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(input_data),
         .output_done(output_done), .output_data(output_data)
     );

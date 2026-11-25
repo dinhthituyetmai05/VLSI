@@ -3,12 +3,9 @@
 
 // Structural top: K=3, rate=1/2, generators (7,5) octal.
 // All state, storage and frame sequencing are owned by viterbi_control.
-module viterbi_top #(
-    // 0 matches the PDF example: first symbol is input_data[1:0],
-    // and the first recovered information bit becomes output_data[0].
-    // 1 processes input_data[15:14] first and writes output_data[7] first.
-    parameter MSB_FIRST = 0
-) (
+// Symbols are read from input_data[15:14] down to input_data[1:0].
+// The first recovered information bit is stored in output_data[7].
+module viterbi_top (
     input  wire clk,
     input  wire rstn,
     input  wire viterbi_enable,
@@ -23,7 +20,7 @@ module viterbi_top #(
     wire [3:0] survivor_select;
     wire [1:0] best_state;
 
-    viterbi_control #(.MSB_FIRST(MSB_FIRST)) control (
+    viterbi_control control (
         .clk(clk), .rstn(rstn), .viterbi_enable(viterbi_enable), .input_data(input_data),
         .next_metrics(next_metrics), .survivor_select(survivor_select),
         .best_state(best_state), .received_symbol(received_symbol),

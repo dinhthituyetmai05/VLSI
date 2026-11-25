@@ -4,9 +4,7 @@
 // Frame controller, metric/survivor storage and traceback for the K=3 decoder.
 // The BMU, ACS unit and final-state selector remain combinational child modules
 // of the structural top. This block supplies their inputs and stores results.
-module viterbi_control #(
-    parameter MSB_FIRST = 0
-) (
+module viterbi_control (
     input  wire clk,
     input  wire rstn,
     input  wire viterbi_enable,
@@ -36,15 +34,13 @@ module viterbi_control #(
 
     wire predecessor_older_bit = survivor_memory[traceback_index][traceback_state];
 
-    assign received_symbol = MSB_FIRST ? encoded_shift[15:14] : encoded_shift[1:0];
+    assign received_symbol = encoded_shift[15:14];
 
     always @* begin
         decoded_next = decoded_work;
         // A destination state's MSB is the input bit that entered that state.
-        if (MSB_FIRST)
-            decoded_next[3'd7 - traceback_index] = traceback_state[1];
-        else
-            decoded_next[traceback_index] = traceback_state[1];
+        // Traceback visits the last symbol first: output bits 0 through 7.
+        decoded_next[3'd7 - traceback_index] = traceback_state[1];
     end
 
     always @(posedge clk or negedge rstn) begin
@@ -76,8 +72,7 @@ module viterbi_control #(
                 DECODE: begin
                     path_metrics <= next_metrics;
                     survivor_memory[symbol_index] <= survivor_select;
-                    encoded_shift <= MSB_FIRST ? {encoded_shift[13:0], 2'b00}
-                                               : {2'b00, encoded_shift[15:2]};
+                    encoded_shift <= {encoded_shift[13:0], 2'b00};
                     if (symbol_index == 3'd7)
                         control_state <= SELECT_FINAL_STATE;
                     else

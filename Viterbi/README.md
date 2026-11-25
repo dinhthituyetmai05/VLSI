@@ -76,21 +76,18 @@ toán theo giao thức, không phải kết quả đo timing vật lý.
 
 ## Thứ tự bit
 
-Mặc định `MSB_FIRST=0`, theo ví dụ tài liệu đọc cặp ở phía phải trước:
+Thứ tự được cố định từ trái sang phải, không có tham số chọn chiều đọc:
 
-- Bit thông tin đầu tiên là output_data[0].
-- Cặp nhận đầu tiên là input_data[1:0], sau đó [3:2], ..., [15:14].
+- Tám symbol lần lượt là input_data[15:14], [13:12], [11:10], [9:8],
+  [7:6], [5:4], [3:2], [1:0].
+- Tám bit thông tin theo thời gian nằm ở output_data[7] đến output_data[0].
 - Trong mỗi cặp `{v1,v2}`, v1 ở bit cao và v2 ở bit thấp.
+- Thanh ghi khung dịch trái 2 bit sau mỗi lần cập nhật metric.
+- Traceback đọc lịch sử từ bước 7 về 0, nên ghi bộ đệm từ bit 0 lên bit 7.
 
-Ví dụ của tài liệu: dữ liệu 6 bit `011001` được đọc theo thời gian là
-`1,0,0,1,1,0`; các cặp tạo ra lần lượt `11,10,11,11,01,01`, nên từ nhị phân
-lưu là `010111111011`. Nếu bổ sung hai bit dữ liệu 0 để thành khung 8 bit,
-`8'h19` mã hóa thành `16'h35fb`.
-
-Đặt `MSB_FIRST=1` nếu hệ thống đọc bit thông tin [7] trước và cặp mã [15:14]
-trước. Thứ tự `{v1,v2}` bên trong mỗi cặp vẫn giữ nguyên. Khi tích hợp dữ liệu
-của giảng viên cần kiểm tra quy ước này, đặc biệt nếu chương trình mã hóa
-có cách đóng gói cặp khác hoặc giữ trạng thái liên tục qua các khung.
+Ví dụ: byte `8'h19` (00011001) mã hóa thành `16'h035f`.
+Chuỗi 10011000 (`8'h98`) tạo các symbol 11, 10, 11, 11, 01, 01, 11, 00,
+được đóng gói thành `16'hef5c`.
 
 ## Các file và ánh xạ từ code cũ
 
@@ -136,11 +133,12 @@ python scripts/run_tests.py --iverilog .tools/iverilog/app/bin/iverilog.exe --vv
 Script tự sinh oracle bằng cách mã hóa đủ 256 bản tin theo công thức đa thức,
 rồi duyệt toàn bộ codebook để tìm khoảng cách Hamming nhỏ nhất cho từng
 giá trị nhận 16 bit. Oracle không dùng lại trellis/ACS của DUT. Nếu hòa,
-chọn byte thông tin nhỏ nhất, tương đương quy tắc hòa của RTL ở chế độ LSB.
+ưu tiên byte có giá trị đảo thứ tự 8 bit nhỏ nhất, tương đương quy tắc
+hòa predecessor/state hiện có của RTL khi đọc từ trái sang phải.
 
 Testbench kiểm tra:
 
-- Tất cả 65.536 từ nhận, gồm cả dữ liệu lỗi và trường hợp hòa, ở cả hai thứ tự bit.
+- Tất cả 65.536 từ nhận, gồm cả dữ liệu lỗi và trường hợp hòa, theo thứ tự cố định từ trái sang phải.
 - Cả 256 bản tin sạch và ví dụ mã hóa trong tài liệu.
 - Enable khi đang xử lý, thay đổi bus sau chốt, độ trễ, xung output_done, giữ kết quả.
 - Giữ enable qua thời điểm hoàn tất: nhận khung kế tiếp tại N+18.
@@ -156,8 +154,8 @@ python scripts/run_tests.py --encoded "duong_dan/output.txt" --expected "duong_d
 Mỗi từ là chuỗi nhị phân đúng 16/8 ký tự, không có tiền tố hoặc comment.
 Hai file phải có cùng số từ và không được rỗng. `tb_viterbi_files.sv` dùng
 mặc định tên output.txt/input.txt; có thể truyền +ENCODED=... và +EXPECTED=...
-khi chạy vvp. Tham số MSB_FIRST của testbench có thể đổi lúc compile bằng
-`-Ptb_viterbi_files.MSB_FIRST=1`. Script Python mặc định chạy file ở chế độ LSB.
+khi chạy vvp. File dữ liệu mã hóa được đọc theo thứ tự từ trái sang phải,
+mỗi lần lấy một cặp 2 bit. Không có tùy chọn đổi thứ tự bit.
 
 File log và verification_summary.json nằm trong build/. Dữ liệu mẫu không
 được coi là dữ liệu chính thức của giảng viên.

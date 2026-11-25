@@ -1,8 +1,7 @@
 {
   "exhaustive_received_words": 65536,
   "bit_orders_tested": [
-    "LSB first",
-    "MSB first"
+    "fixed MSB first"
   ],
   "clean_messages": 256,
   "reset_abort_recovery_cases": 5,
